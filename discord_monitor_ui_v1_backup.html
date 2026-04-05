@@ -1,0 +1,4388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<title>Drop Scout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & Root ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0a0b0f;
+    --surface:  #0f1117;
+    --panel:    #13161e;
+    --border:   #1e2330;
+    --border2:  #252b3b;
+    --text:     #c8d0e8;
+    --muted:    #4a5270;
+    --accent:   #5865f2;
+    --accent2:  #7289da;
+    --green:    #3ba55c;
+    --yellow:   #faa61a;
+    --red:      #ed4245;
+    --cyan:     #00b0f4;
+    --purple:   #9b59b6;
+    --glow:     rgba(88,101,242,0.15);
+    --glow2:    rgba(88,101,242,0.06);
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-ui:   'Syne', sans-serif;
+    --radius:    10px;
+    --radius-sm: 6px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* ── Layout ── */
+  #app {
+    display: grid;
+    grid-template-rows: 52px 1fr;
+    grid-template-columns: 280px 1fr;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── Header ── */
+  #header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(15,17,23,0.82);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border-bottom: 1px solid rgba(88,101,242,0.12);
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: #fff;
+  }
+
+  .logo-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 12px rgba(88,101,242,0.5);
+    animation: pulse-glow 3s ease-in-out infinite;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 12px rgba(88,101,242,0.4); }
+    50% { box-shadow: 0 0 20px rgba(88,101,242,0.8); }
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    flex-shrink: 1;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: all 0.3s;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.3s;
+  }
+
+  .status-badge.running .status-dot {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  .status-badge.running { border-color: rgba(59,165,92,0.3); color: var(--green); }
+  .status-badge.error .status-dot { background: var(--red); }
+  .status-badge.error { border-color: rgba(237,66,69,0.3); color: var(--red); }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .stat-chips {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    flex-shrink: 1;
+    min-width: 0;
+    scrollbar-width: none;
+  }
+  .stat-chips::-webkit-scrollbar { display: none; }
+
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .chip span { color: var(--text); font-weight: 600; }
+  .chip.flash { animation: chip-flash 0.6s ease; }
+  @keyframes chip-flash {
+    0%   { background: rgba(88,101,242,0.35); border-color: var(--accent); }
+    100% { background: var(--panel); border-color: var(--border); }
+  }
+
+  /* ── Sidebar (see glassmorphism override below) ── */
+
+  .nav-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .nav-tab {
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+  .nav-tab[data-tab="sync"] { grid-column: 1 / -1; border-top: 1px solid var(--border); background: rgba(88,101,242,0.04); font-size: 10px; padding: 7px 4px; }
+  .switch-slider::before { position:absolute; content:""; height:16px; width:16px; left:2px; bottom:2px; background:var(--muted); border-radius:50%; transition:.2s; }
+  input:checked + .switch-slider { background:var(--accent); }
+  input:checked + .switch-slider::before { transform:translateX(16px); background:#fff; }
+
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: none;
+  }
+  .tab-content.active { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ── Form Elements ── */
+  .field-group { display: flex; flex-direction: column; gap: 5px; }
+
+  label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  input, textarea {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 10px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--glow2);
+  }
+
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.6; }
+  textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
+
+  .field-hint {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.7;
+    line-height: 1.4;
+  }
+
+  /* ── Toggle ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+
+  .toggle-label { font-size: 12px; color: var(--text); }
+
+  .toggle {
+    position: relative;
+    width: 36px; height: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .toggle input { display: none; }
+
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--border2);
+    border-radius: 20px;
+    transition: background 0.25s;
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: all 0.25s;
+  }
+
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle input:checked ~ .toggle-thumb { left: 19px; background: #fff; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 16px var(--glow);
+  }
+  .btn-primary:hover { background: var(--accent2); box-shadow: 0 0 24px rgba(88,101,242,0.4); }
+  .btn-primary:active { transform: scale(0.97); }
+
+  .btn-danger { background: rgba(237,66,69,0.15); color: var(--red); border: 1px solid rgba(237,66,69,0.3); }
+  .btn-danger:hover { background: rgba(237,66,69,0.25); }
+
+  .btn-ghost { background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+  .btn-full { width: 100%; }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Section separator ── */
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Control Panel ── */
+  .control-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #uptime-display {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: 2px;
+    padding: 6px 0;
+    display: none;
+  }
+  #uptime-display.visible { display: block; }
+
+  /* ── Main Area ── */
+  #main {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  /* ── Log Toolbar ── */
+  .log-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    gap: 6px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 44px;
+  }
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .toolbar-divider { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+  .toggle-active { opacity: 1; }
+  .toggle-off { opacity: 0.35; }
+  .refresh-status {
+    min-width: 70px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-align: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .refresh-status.live {
+    color: #9be6b1;
+    border-color: rgba(59,165,92,0.35);
+    background: rgba(59,165,92,0.12);
+  }
+  .refresh-status.stale {
+    color: #ffd67a;
+    border-color: rgba(250,166,26,0.38);
+    background: rgba(250,166,26,0.12);
+  }
+  .live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid rgba(59,165,92,0.35);
+    color: #9be6b1;
+    background: rgba(59,165,92,0.12);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .live-indicator::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .live-indicator.syncing {
+    color: #bcd2ff;
+    border-color: rgba(114,137,218,0.45);
+    background: rgba(88,101,242,0.14);
+  }
+
+  .log-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--panel);
+    padding: 3px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+
+  .filter-tab {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .filter-tab:hover { color: var(--text); }
+  .filter-tab.active { background: var(--border2); color: var(--text); }
+
+  .search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  #log-search {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 10px 5px 26px;
+    width: 160px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #log-search:focus { border-color: var(--accent); }
+
+  /* ── Log Container ── */
+  #log-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scroll-behavior: smooth;
+  }
+
+  #empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 40px;
+  }
+
+  .empty-icon { font-size: 36px; opacity: 0.4; }
+  .empty-title { font-family: var(--font-ui); font-size: 15px; font-weight: 600; }
+  .empty-sub { font-size: 11px; line-height: 1.5; opacity: 0.6; }
+
+  /* ── Log Entry ── */
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: var(--surface);
+    animation: slide-in 0.25s ease-out;
+    cursor: default;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .log-entry:hover { background: var(--panel); border-color: var(--border); }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes alert-flash {
+    0%   { box-shadow: 0 0 0 0 rgba(76,212,136,0.6); border-color: rgba(76,212,136,0.7); }
+    50%  { box-shadow: 0 0 0 6px rgba(76,212,136,0); }
+    100% { box-shadow: 0 0 0 0 rgba(76,212,136,0); border-color: rgba(88,101,242,0.2); }
+  }
+  .log-entry.level-alert.is-fresh {
+    animation: slide-in 0.25s ease-out, alert-flash 1.2s ease-out 0.25s;
+  }
+
+  .log-entry.level-alert {
+    background: rgba(88,101,242,0.06);
+    border-color: rgba(88,101,242,0.2);
+  }
+
+  .log-entry.level-alert:hover {
+    background: rgba(88,101,242,0.1);
+    border-color: rgba(88,101,242,0.35);
+  }
+
+  .log-entry.level-error { background: rgba(237,66,69,0.05); border-color: rgba(237,66,69,0.15); }
+  .log-entry.level-warning { background: rgba(250,166,26,0.04); border-color: rgba(250,166,26,0.12); }
+  .log-entry.level-success { background: rgba(59,165,92,0.04); border-color: rgba(59,165,92,0.12); }
+
+  .log-time {
+    font-size: 11px;
+    color: #b9c8ff;
+    flex-shrink: 0;
+    padding: 2px 6px;
+    height: fit-content;
+    border-radius: 6px;
+    border: 1px solid rgba(88,101,242,0.22);
+    background: rgba(88,101,242,0.1);
+    width: 62px;
+    text-align: center;
+  }
+
+  .log-icon { flex-shrink: 0; font-size: 13px; width: 16px; text-align: center; }
+
+  .log-body { flex: 1; min-width: 0; }
+
+  .log-message {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.55;
+    word-break: break-word;
+  }
+
+  /* ── Alert Card (expanded) ── */
+  /* ── Alert Card ── */
+  .alert-card {
+    margin-top: 10px;
+    background: linear-gradient(160deg, rgba(15,18,30,0.98) 0%, rgba(10,12,20,0.99) 100%);
+    border: 1px solid rgba(88,101,242,0.2);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 16px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .alert-card.clickable { cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+  .alert-card.clickable:hover {
+    border-color: rgba(88,101,242,0.55);
+    box-shadow: 0 0 0 1px rgba(88,101,242,0.12), 0 6px 24px rgba(0,0,0,0.5);
+  }
+
+  /* Top row: left content + right image */
+  .ac-top { display: flex; gap: 14px; align-items: flex-start; }
+  .ac-top-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ac-top-right { flex-shrink: 0; }
+
+  /* Meta pills row */
+  .ac-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+  .meta-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #a0aec0;
+  }
+  .meta-pill.server  { background: rgba(88,101,242,0.12); border-color: rgba(88,101,242,0.3); color: #8fa0f5; }
+  .meta-pill.channel { background: rgba(0,176,244,0.1); border-color: rgba(0,176,244,0.3); color: #4dc3f7; }
+  .meta-pill.kw      { background: rgba(250,166,26,0.1); border-color: rgba(250,166,26,0.3); color: #f5c842; }
+  .meta-pill.author  { background: rgba(155,89,182,0.1); border-color: rgba(155,89,182,0.3); color: #c39bd3; }
+
+  /* NEW badge */
+  .badge-new {
+    display: inline-flex; align-items: center;
+    padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    background: rgba(250,100,50,0.9); color: #fff;
+    animation: new-pop 0.4s ease;
+  }
+  @keyframes new-pop {
+    0% { transform: scale(0.7); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Title row */
+  .ac-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ac-title {
+    font-size: 14px; font-weight: 700; color: #eef0ff;
+    line-height: 1.35; word-break: break-word; font-family: var(--font-ui);
+  }
+
+  /* Retailer badge */
+  .retailer-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .rt-amazon  { background: rgba(255,153,0,0.15); border: 1px solid rgba(255,153,0,0.4); color: #ffa030; }
+  .rt-walmart { background: rgba(0,113,206,0.15); border: 1px solid rgba(0,113,206,0.4); color: #4eaaff; }
+  .rt-target  { background: rgba(204,0,0,0.15);   border: 1px solid rgba(204,0,0,0.4);   color: #ff6060; }
+  .rt-bn      { background: rgba(0,130,60,0.15);  border: 1px solid rgba(0,130,60,0.4);  color: #4cd488; }
+  .rt-lego    { background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.4); color: #ffd040; }
+
+  /* Type badge */
+  .type-badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 9px; border-radius: 5px; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    background: rgba(59,165,92,0.15); border: 1px solid rgba(59,165,92,0.35); color: #3ba55c;
+  }
+
+  /* Price row */
+  .ac-price-row {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+  }
+  .price-main {
+    font-size: 22px; font-weight: 800; color: #4cd488;
+    font-family: var(--font-ui); letter-spacing: -0.5px;
+    text-shadow: 0 0 20px rgba(76,212,136,0.3);
+  }
+  .price-was  { font-size: 12px; color: #6272a4; text-decoration: line-through; }
+  .price-save { font-size: 12px; font-weight: 700; color: #f8b500;
+    background: rgba(248,181,0,0.12); border: 1px solid rgba(248,181,0,0.3);
+    padding: 1px 7px; border-radius: 4px; }
+  .order-limit {
+    font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .limit-red    { background: rgba(237,66,69,0.15); border: 1px solid rgba(237,66,69,0.4); color: #ff6060; }
+  .limit-orange { background: rgba(250,166,26,0.15); border: 1px solid rgba(250,166,26,0.4); color: #faa61a; }
+  .limit-gray   { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #8899aa; }
+
+  /* Info pills (SKU, Seller, etc.) */
+  .ac-info-row { display: flex; flex-wrap: wrap; gap: 5px; }
+  .info-pill {
+    font-size: 10.5px; color: #8892b0;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    padding: 3px 9px; border-radius: 5px;
+  }
+  .info-pill b { color: #c0cce8; font-weight: 600; }
+
+  /* Body text for live-alerts */
+  .ac-body {
+    font-size: 12.5px; color: #c8d4f0; line-height: 1.55;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px;
+  }
+
+  /* Variants */
+  .ac-variants { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .variants-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .variant-btn {
+    font-size: 11px; font-weight: 600; text-decoration: none; color: #a8b8f0;
+    background: rgba(88,101,242,0.1); border: 1px solid rgba(88,101,242,0.25);
+    padding: 3px 10px; border-radius: 5px; transition: background 0.1s;
+  }
+  .variant-btn:hover { background: rgba(88,101,242,0.2); }
+  .variant-btn.no-link { cursor: default; color: #6272a4; }
+
+  /* Product images */
+  .alert-images { display: flex; flex-direction: column; gap: 6px; }
+  .alert-img {
+    width: 100px; height: 100px; object-fit: contain;
+    border-radius: 8px; border: 1px solid var(--border2);
+    background: #0d0f1a; display: block;
+  }
+
+  /* Time */
+  .ac-time { font-size: 10px; color: #4a5270; margin-top: 2px; }
+
+  /* Actions row */
+  .ac-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); }
+  .alert-qlinks { display: contents; }
+
+  .btn-atc {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 18px; border-radius: 7px;
+    background: linear-gradient(135deg, #2cbb5d, #1a9448);
+    color: #fff; font-weight: 800; font-size: 13px; text-decoration: none;
+    letter-spacing: 0.2px; transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 0 2px 12px rgba(44,187,93,0.35);
+  }
+  .btn-atc:hover { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(44,187,93,0.5); }
+
+  .btn-deal {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 14px; border-radius: 7px;
+    background: rgba(88,101,242,0.15); border: 1px solid rgba(88,101,242,0.35);
+    color: #8fa0f5; font-weight: 700; font-size: 12px; text-decoration: none;
+    transition: background 0.12s;
+  }
+  .btn-deal:hover { background: rgba(88,101,242,0.28); }
+
+  .qlink {
+    display: inline-flex; align-items: center;
+    padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600;
+    text-decoration: none; border: 1px solid var(--border2);
+    background: rgba(255,255,255,0.04); color: #b0bdd8;
+    transition: background 0.1s, border-color 0.1s; white-space: nowrap;
+  }
+  .qlink:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
+  .qlink-ebay      { background: rgba(229,33,33,0.08); border-color: rgba(229,33,33,0.25); color: #f5605a; }
+  .qlink-amazon    { background: rgba(255,153,0,0.08); border-color: rgba(255,153,0,0.25); color: #ffa030; }
+  .qlink-walmart   { background: rgba(0,113,206,0.08); border-color: rgba(0,113,206,0.25); color: #4eaaff; }
+  .qlink-target    { background: rgba(204,0,0,0.08);   border-color: rgba(204,0,0,0.25);   color: #ff6060; }
+  .qlink-keepa     { background: rgba(50,180,100,0.08);border-color: rgba(50,180,100,0.25);color: #4cd488; }
+  .qlink-selleramp { background: rgba(130,80,220,0.08);border-color: rgba(130,80,220,0.25);color: #b080f0; }
+  .qlink-lightning { background: rgba(250,200,10,0.08);border-color: rgba(250,200,10,0.25);color: #f8d030; }
+  .qlink-google    { background: rgba(66,133,244,0.08);border-color: rgba(66,133,244,0.25);color: #7ab4ff; }
+  .qlink-discord   { background: rgba(88,101,242,0.08);border-color: rgba(88,101,242,0.25);color: #8fa0f5; }
+
+  /* ── Keyword Tags ── */
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 8px 0 0;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+
+  .tag-remove {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .tag-remove:hover { color: var(--red); }
+
+  .tag-input-wrap {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .tag-input-wrap input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Channel List ── */
+  .channel-list { display: flex; flex-direction: column; gap: 5px; }
+
+  .channel-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.15s;
+  }
+  .channel-item:hover { border-color: var(--border2); }
+
+  .channel-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .channel-name {
+    font-size: 12px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .channel-id {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .channel-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .mode-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    letter-spacing: 0.3px;
+  }
+
+  .mode-badge.mode-keywords {
+    background: rgba(88,101,242,0.1);
+    border: 1px solid rgba(88,101,242,0.3);
+    color: var(--accent2);
+  }
+
+  .mode-badge.mode-all {
+    background: rgba(250,166,26,0.15);
+    border: 1px solid rgba(250,166,26,0.4);
+    color: var(--yellow);
+  }
+
+  .mode-badge:hover {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+
+  .channel-remove {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .channel-remove:hover { color: var(--red); }
+
+  /* ── Toast Notifications ── */
+  #toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .toast {
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: auto;
+    animation: toast-in 0.25s ease-out;
+    max-width: 280px;
+    border: 1px solid transparent;
+  }
+
+  .toast.success { background: rgba(17,54,29,0.95); border-color: rgba(87,242,135,0.45); color: #bfffd6; }
+  .toast.error { background: rgba(69,22,24,0.95); border-color: rgba(255,107,107,0.45); color: #ffd2d2; }
+  .toast.info { background: rgba(26,32,68,0.95); border-color: rgba(114,137,218,0.5); color: #d8e1ff; }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+  /* ── Scrollbar for textareas ── */
+  .small-scroll { max-height: 120px; overflow-y: auto; }
+
+  /* ── Alert count badge ── */
+  .alert-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--accent);
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    animation: pop 0.3s ease-out;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(0.5); }
+    70% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  /* ── Responsive small tweaks ── */
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+
+  /* Token mask */
+  .token-field { position: relative; }
+  .token-show-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 11px;
+    user-select: none;
+  }
+  .token-show-btn:hover { color: var(--text); }
+  .token-field input { padding-right: 48px; }
+
+  /* ── Priority System ── */
+  .log-entry.priority-high {
+    background: rgba(237,66,69,0.08);
+    border-color: rgba(237,66,69,0.35);
+    box-shadow: 0 0 15px rgba(237,66,69,0.1);
+  }
+  .log-entry.priority-high .alert-card { border-left-color: var(--red); }
+  .log-entry.priority-high.is-fresh {
+    animation: slide-in 0.25s ease-out, urgent-flash 1.5s ease-out 0.25s;
+  }
+  @keyframes urgent-flash {
+    0%, 50% { box-shadow: 0 0 20px rgba(237,66,69,0.4); }
+    100% { box-shadow: 0 0 15px rgba(237,66,69,0.1); }
+  }
+  .log-entry.priority-low { opacity: 0.75; }
+  .log-entry.priority-low .alert-card { border-left-color: var(--muted); }
+  .priority-badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .priority-badge.p-high { background: rgba(237,66,69,0.2); color: #ff6060; }
+  .priority-badge.p-low { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+  /* ── Stats Dashboard ── */
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px; text-align: center;
+  }
+  .stat-value {
+    font-size: 20px; font-weight: 800; color: var(--accent2);
+    font-family: var(--font-ui);
+  }
+  .stat-label {
+    font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-top: 2px;
+  }
+  .stats-list { display: flex; flex-direction: column; gap: 4px; }
+  .stats-list-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 11px; color: var(--text);
+  }
+  .stats-list-item .kw-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stats-list-item .count {
+    font-weight: 700; color: var(--accent2); flex-shrink: 0;
+    background: rgba(88,101,242,0.12); padding: 1px 8px; border-radius: 10px; font-size: 10px;
+  }
+  .stats-list-item .bar-bg {
+    flex: 1; height: 3px; background: var(--border); border-radius: 2px; margin: 0 8px;
+  }
+  .stats-list-item .bar-fill {
+    height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s;
+  }
+
+  /* ── Sound Controls ── */
+  .sound-controls { display: flex; flex-direction: column; gap: 8px; }
+  .volume-row { display: flex; align-items: center; gap: 8px; }
+  .volume-icon { font-size: 14px; flex-shrink: 0; }
+  .volume-value { font-size: 10px; color: var(--muted); width: 28px; text-align: right; flex-shrink: 0; }
+  .volume-slider {
+    -webkit-appearance: none; flex: 1; height: 4px;
+    background: var(--border2); border-radius: 2px; outline: none;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: var(--accent); border-radius: 50%; cursor: pointer;
+  }
+  .sound-preset-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sound-preset-btn {
+    padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; transition: all 0.15s; font-family: var(--font-mono);
+  }
+  .sound-preset-btn:hover { color: var(--text); border-color: var(--border2); }
+  .sound-preset-btn.active {
+    background: rgba(88,101,242,0.15); border-color: rgba(88,101,242,0.4); color: var(--accent2);
+  }
+
+  /* ── Profit Calculator ── */
+  .calc-result {
+    text-align: center; padding: 8px 0;
+    font-size: 11px; color: var(--muted);
+  }
+  .calc-profit { font-size: 20px; font-weight: 800; font-family: var(--font-ui); }
+  .calc-roi { font-size: 11px; color: var(--muted); margin-left: 6px; }
+
+  /* ── Keyword Groups ── */
+  .keyword-group {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px;
+  }
+  .keyword-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .keyword-group-name {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--text);
+  }
+  .keyword-group-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .keyword-group-count { font-size: 10px; color: var(--muted); font-weight: 400; }
+  .keyword-group-actions { display: flex; gap: 4px; }
+  .tag.grouped { border-left: 3px solid; }
+
+  /* ── Auto-save indicator ── */
+  #auto-save-indicator {
+    font-size: 10px; color: var(--green); font-weight: 600;
+    opacity: 0; transition: opacity 0.3s; margin-left: 8px;
+  }
+
+  /* ── Webhook list ── */
+  .webhook-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 11px;
+  }
+  .webhook-item .wh-name { font-weight: 600; color: var(--text); }
+  .webhook-item .wh-url { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+
+  /* ── Mobile Responsive ── */
+  .mobile-menu-btn {
+    display: none;
+    padding: 6px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  @media (max-width: 768px) {
+    #app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 52px auto 1fr;
+    }
+    #sidebar {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      max-height: 50vh;
+      display: none;
+    }
+    #sidebar.mobile-open { display: flex; }
+    .mobile-menu-btn { display: block; }
+    #header { padding: 0 10px; }
+    .stat-chips { display: none; }
+    .logo { font-size: 14px; }
+    .log-toolbar { flex-wrap: wrap; padding: 6px 8px; gap: 4px; overflow-x: visible; }
+    .log-toolbar-left { width: 100%; flex-shrink: 1; }
+    .toolbar-right { width: 100%; justify-content: flex-start; flex-wrap: wrap; gap: 4px; }
+    .filter-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .filter-tabs::-webkit-scrollbar { display: none; }
+    #log-search { width: 120px; flex-shrink: 1; }
+    .refresh-status { min-width: auto; }
+    .toolbar-divider { display: none; }
+    .ac-top { flex-direction: column; }
+    .ac-top-right { align-self: flex-start; }
+    .ac-actions { flex-wrap: wrap; }
+    .alert-img { width: 80px; height: 80px; }
+  }
+
+  @media (max-width: 480px) {
+    .ac-title { font-size: 12px; }
+    .price-main { font-size: 18px; }
+    .meta-pill { font-size: 9px; padding: 1px 6px; }
+    .btn-atc { padding: 5px 12px; font-size: 11px; }
+    .qlink { font-size: 10px; padding: 3px 8px; }
+  }
+
+  /* ── Copy Title Button ── */
+  .btn-copy-title {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600;
+    text-decoration: none; border: 1px solid var(--border2);
+    background: rgba(255,255,255,0.04); color: #b0bdd8;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+  .btn-copy-title:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
+  .btn-copy-title.copied { background: rgba(59,165,92,0.15); border-color: rgba(59,165,92,0.4); color: var(--green); }
+
+  /* ── Product IDs (ASIN/TCIN/SKU) ── */
+  .product-ids-row {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px;
+    padding: 6px 8px; background: rgba(88,101,242,0.06);
+    border: 1px solid rgba(88,101,242,0.15); border-radius: 6px;
+  }
+  .product-ids-row .pid-label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    color: var(--muted); letter-spacing: 0.8px; width: 100%;
+    margin-bottom: 2px; display: flex; align-items: center; gap: 6px;
+  }
+  .pid-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 4px; font-size: 11px;
+    font-weight: 600; font-family: var(--font-mono);
+    cursor: pointer; transition: all 0.15s; user-select: all;
+  }
+  .pid-chip:hover { filter: brightness(1.3); }
+  .pid-chip.copied { background: rgba(59,165,92,0.25) !important; border-color: rgba(59,165,92,0.5) !important; color: var(--green) !important; }
+  .pid-chip.asin {
+    background: rgba(255,153,0,0.12); border: 1px solid rgba(255,153,0,0.3);
+    color: #ffa830;
+  }
+  .pid-chip.tcin {
+    background: rgba(237,66,69,0.1); border: 1px solid rgba(237,66,69,0.25);
+    color: #f58585;
+  }
+  .pid-chip.sku-id {
+    background: rgba(114,137,218,0.1); border: 1px solid rgba(114,137,218,0.25);
+    color: var(--accent2);
+  }
+  .pid-chip.url-chip {
+    background: rgba(0,176,244,0.08); border: 1px solid rgba(0,176,244,0.2);
+    color: var(--cyan); font-size: 10px; max-width: 280px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pid-chip .pid-icon { font-size: 10px; opacity: 0.7; flex-shrink: 0; }
+  .pid-chip .pid-copy { font-size: 9px; opacity: 0.5; margin-left: 2px; }
+  .pid-chip:hover .pid-copy { opacity: 1; }
+  .pid-resolve-btn {
+    padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+    background: rgba(88,101,242,0.12); border: 1px solid rgba(88,101,242,0.3);
+    color: var(--accent2); cursor: pointer; transition: all 0.15s;
+    font-family: var(--font-mono);
+  }
+  .pid-resolve-btn:hover { background: rgba(88,101,242,0.22); }
+  .pid-resolve-btn:disabled { opacity: 0.5; cursor: wait; }
+  .deal-product-ids { margin-top: 4px; }
+  .deal-product-ids .product-ids-row {
+    padding: 4px 6px; margin-top: 4px;
+  }
+
+  /* ── Time Ago ── */
+  .ac-time-ago {
+    font-size: 10px; color: var(--muted); font-style: italic;
+    transition: color 0.3s;
+  }
+  .ac-time-ago.recent { color: var(--green); font-weight: 600; font-style: normal; }
+  .ac-time-ago.stale { color: var(--yellow); }
+
+  /* ── Keyword Group Assignment ── */
+  .tag-group-assign {
+    display: inline-flex; align-items: center; gap: 2px;
+    margin-left: 2px;
+  }
+  .tag-group-select {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 3px; padding: 1px 3px; font-size: 9px; font-family: var(--font-mono);
+    cursor: pointer; max-width: 60px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .tag-group-select:hover { border-color: var(--accent); color: var(--text); }
+  .tag-group-select:focus { border-color: var(--accent); }
+
+  /* ── Webhook Toggle ── */
+  .webhook-toggle {
+    position: relative; width: 28px; height: 16px; flex-shrink: 0; cursor: pointer;
+  }
+  .webhook-toggle input { display: none; }
+  .webhook-toggle .wh-track {
+    position: absolute; inset: 0; background: var(--border2); border-radius: 16px; transition: background 0.25s;
+  }
+  .webhook-toggle .wh-thumb {
+    position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+    background: var(--muted); border-radius: 50%; transition: all 0.25s;
+  }
+  .webhook-toggle input:checked + .wh-track { background: var(--green); }
+  .webhook-toggle input:checked ~ .wh-thumb { left: 14px; background: #fff; }
+  .webhook-item.disabled { opacity: 0.5; }
+
+  /* ── Alert History Browser ── */
+  .history-controls { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .history-controls .btn { font-size: 10px; padding: 4px 10px; }
+  .history-page-info { font-size: 10px; color: var(--muted); }
+  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+  .history-item {
+    padding: 8px 10px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s;
+  }
+  .history-item:hover { border-color: var(--accent); background: rgba(88,101,242,0.06); }
+  .history-item-title {
+    font-size: 11px; font-weight: 600; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .history-item-meta {
+    display: flex; gap: 8px; margin-top: 3px; font-size: 9px; color: var(--muted);
+  }
+
+  /* ── Glassmorphism Sidebar ── */
+  #sidebar {
+    background: rgba(15,17,23,0.75);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border-right: 1px solid rgba(88,101,242,0.08);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ── Animated accent line on header ── */
+  #header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(88,101,242,0.5), rgba(114,137,218,0.3), transparent);
+    animation: header-glow 4s ease-in-out infinite;
+  }
+  @keyframes header-glow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* ── Stat card hover effects ── */
+  .stat-card { transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(88,101,242,0.3);
+    box-shadow: 0 4px 12px rgba(88,101,242,0.1);
+  }
+
+  /* ── Enhanced alert card glow for high priority ── */
+  .log-entry.priority-high .alert-card {
+    border-image: linear-gradient(135deg, rgba(237,66,69,0.6), rgba(250,166,26,0.4)) 1;
+    border-image-slice: 1;
+    border-left: 3px solid var(--red);
+  }
+
+  /* ── Flip log viewer ── */
+  .flip-log-viewer { max-height: 200px; overflow-y: auto; margin-top: 6px; }
+  .flip-entry {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 8px; font-size: 10px; color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  .flip-entry:last-child { border-bottom: none; }
+  .flip-profit { font-weight: 700; }
+  .flip-profit.positive { color: var(--green); }
+  .flip-profit.negative { color: var(--red); }
+
+  /* ── Context-aware empty states ── */
+  .empty-state-action {
+    margin-top: 8px; padding: 6px 16px; border-radius: var(--radius-sm);
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: none; font-family: var(--font-mono);
+    transition: background 0.15s;
+  }
+  .empty-state-action:hover { background: var(--accent2); }
+
+  /* ── Pulse animation for live status ── */
+  @keyframes pulse-live {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  .status-badge.running { animation: pulse-live 3s ease-in-out infinite; }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     DEALS ANALYZER TAB
+     ═══════════════════════════════════════════════════════════════════════ */
+  #deals-container { display:none; overflow:hidden; flex-direction:column; background:var(--bg); grid-column:2; grid-row:2; }
+  #deals-container.active { display:flex; }
+  .deals-toolbar { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+  .deals-toolbar-left { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+  .deals-toolbar-right { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .deals-title-bar { font-family:var(--font-ui); font-size:14px; font-weight:700; color:#fff; white-space:nowrap; }
+  .deals-count { font-size:11px; color:var(--muted); font-weight:400; }
+  .deals-filter-btn { padding:4px 10px; border-radius:4px; font-size:10px; font-weight:600; background:var(--panel); border:1px solid var(--border); color:var(--muted); cursor:pointer; transition:all .15s; font-family:var(--font-mono); white-space:nowrap; }
+  .deals-filter-btn:hover { color:var(--text); border-color:var(--border2); }
+  .deals-filter-btn.active { background:rgba(88,101,242,.15); border-color:rgba(88,101,242,.4); color:var(--accent2); }
+  .deals-sort-select { background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:4px 6px; font-size:10px; font-family:var(--font-mono); cursor:pointer; outline:none; }
+  .deals-scroll { flex:1; overflow-y:auto; padding:14px; }
+  .deals-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; }
+  .deal-card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:all .2s; position:relative; }
+  .deal-card:hover { border-color:rgba(88,101,242,.4); transform:translateY(-3px); box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 0 1px rgba(88,101,242,.1); }
+  .deal-card.profitable { border-left:3px solid var(--green); }
+  .deal-card.unprofitable { border-left:3px solid var(--red); }
+  .deal-card.unknown-profit { border-left:3px solid var(--muted); }
+  .deal-img-wrap { width:100%; height:180px; overflow:hidden; background:linear-gradient(180deg,rgba(10,11,15,.6),rgba(10,11,15,1)); display:flex; align-items:center; justify-content:center; position:relative; }
+  .deal-img { max-width:90%; max-height:170px; object-fit:contain; transition:transform .3s; }
+  .deal-card:hover .deal-img { transform:scale(1.05); }
+  .deal-no-img { font-size:48px; opacity:.15; color:var(--muted); }
+  .deal-retailer-ribbon { position:absolute; top:10px; left:0; padding:3px 12px 3px 8px; font-size:10px; font-weight:800; letter-spacing:.3px; border-radius:0 4px 4px 0; text-transform:uppercase; }
+  .deal-retailer-ribbon.rt-amazon  { background:rgba(255,153,0,.9); color:#1a1a1a; }
+  .deal-retailer-ribbon.rt-walmart { background:rgba(0,113,206,.9); color:#fff; }
+  .deal-retailer-ribbon.rt-target  { background:rgba(204,0,0,.9); color:#fff; }
+  .deal-retailer-ribbon.rt-bn      { background:rgba(0,130,60,.9); color:#fff; }
+  .deal-retailer-ribbon.rt-lego    { background:rgba(255,200,0,.9); color:#1a1a1a; }
+  .deal-retailer-ribbon.rt-other   { background:rgba(88,101,242,.9); color:#fff; }
+  .deal-time-badge { position:absolute; top:10px; right:10px; padding:2px 8px; border-radius:4px; font-size:9px; font-weight:700; background:rgba(0,0,0,.7); color:var(--muted); backdrop-filter:blur(4px); }
+  .deal-time-badge.recent { color:var(--green); }
+  .deal-body { padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+  .deal-title { font-size:13px; font-weight:600; color:var(--text); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-family:var(--font-ui); }
+  .deal-source { display:flex; align-items:center; gap:6px; font-size:10px; color:var(--muted); }
+  .deal-source-channel { background:rgba(0,176,244,.1); border:1px solid rgba(0,176,244,.25); color:#4dc3f7; padding:1px 6px; border-radius:3px; font-weight:600; }
+  .deal-prices { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .deal-price-col { display:flex; flex-direction:column; gap:1px; }
+  .deal-price-label { font-size:8px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+  .deal-buy-price { font-size:18px; font-weight:800; color:var(--text); font-family:var(--font-ui); letter-spacing:-.5px; }
+  .deal-ebay-price { font-size:18px; font-weight:800; color:var(--green); font-family:var(--font-ui); letter-spacing:-.5px; }
+  .deal-ebay-price.loading { color:var(--muted); font-size:11px; font-weight:400; }
+  .deal-profit-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:var(--radius-sm); background:rgba(255,255,255,.03); border:1px solid var(--border); }
+  .deal-profit-amount { font-size:15px; font-weight:800; font-family:var(--font-ui); }
+  .deal-profit-amount.positive { color:var(--green); }
+  .deal-profit-amount.negative { color:var(--red); }
+  .deal-roi { font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px; }
+  .deal-roi.positive { background:rgba(59,165,92,.15); color:var(--green); }
+  .deal-roi.negative { background:rgba(237,66,69,.15); color:var(--red); }
+  .deal-profit-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .deal-profit-fill { height:100%; border-radius:2px; transition:width .5s ease; }
+  .deal-profit-fill.positive { background:linear-gradient(90deg,var(--green),#6cf0a1); }
+  .deal-profit-fill.negative { background:linear-gradient(90deg,var(--red),#ff8080); }
+  .deal-actions { display:flex; gap:4px; flex-wrap:wrap; padding-top:6px; border-top:1px solid var(--border); }
+  .deal-action-btn { padding:5px 10px; border-radius:5px; font-size:10px; font-weight:600; text-decoration:none; border:1px solid var(--border); background:rgba(255,255,255,.03); color:var(--text); cursor:pointer; transition:all .12s; font-family:var(--font-mono); white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
+  .deal-action-btn:hover { background:rgba(255,255,255,.08); border-color:var(--border2); }
+  .deal-action-btn.ebay { background:rgba(229,33,33,.08); border-color:rgba(229,33,33,.25); color:#f5605a; }
+  .deal-action-btn.amazon { background:rgba(255,153,0,.08); border-color:rgba(255,153,0,.25); color:#ffa030; }
+  .deal-action-btn.keepa { background:rgba(50,180,100,.08); border-color:rgba(50,180,100,.25); color:#4cd488; }
+  .deal-lookup-btn { width:100%; padding:7px 12px; border-radius:6px; font-size:11px; font-weight:700; text-align:center; border:1px solid rgba(88,101,242,.4); background:rgba(88,101,242,.15); color:var(--accent2); cursor:pointer; transition:all .15s; font-family:var(--font-mono); margin-bottom:6px; }
+  .deal-lookup-btn:hover { background:rgba(88,101,242,.25); border-color:rgba(88,101,242,.6); }
+  .deal-lookup-btn:disabled { opacity:.5; cursor:wait; }
+  .deals-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center; color:var(--muted); gap:12px; }
+  .deals-empty-icon { font-size:48px; opacity:.3; }
+  .deals-empty-title { font-family:var(--font-ui); font-size:16px; font-weight:600; color:var(--text); }
+  .deals-empty-sub { font-size:12px; line-height:1.6; }
+  @media (max-width:768px) { .deals-grid { grid-template-columns:1fr; } .deal-img-wrap { height:140px; } }
+  @media (min-width:1400px) { .deals-grid { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); } }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── HEADER ── -->
+  <header id="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+          <defs>
+            <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#7289da"/>
+              <stop offset="100%" stop-color="#5865f2"/>
+            </linearGradient>
+          </defs>
+          <rect width="30" height="30" rx="8" fill="url(#lg)"/>
+          <path d="M15 4 L20.5 13 L15 11 L9.5 13 Z" fill="#fff" opacity="0.95"/>
+          <path d="M9.5 13 L15 11 L20.5 13 L18 22 L15 18 L12 22 Z" fill="#fff" opacity="0.7"/>
+          <circle cx="15" cy="25" r="1.5" fill="#3ba55c" opacity="0.9"/>
+        </svg>
+      </div>
+      Drop Scout
+    </div>
+
+    <button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+
+    <div class="header-status">
+      <div class="stat-chips">
+        <div class="chip">Alerts <span id="h-alerts">0</span></div>
+        <div class="chip">Msgs <span id="h-msgs">0</span></div>
+        <div class="chip" id="h-last-chip" style="display:none">Last <span id="h-last">—</span></div>
+        <div class="chip">Uptime <span id="h-uptime">—</span></div>
+        <div class="chip" id="h-sync-chip" style="display:none">☁ <span id="h-sync-status">Off</span></div>
+      </div>
+      <div id="status-badge" class="status-badge">
+        <div class="status-dot"></div>
+        <span id="status-text">Offline</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── SIDEBAR ── -->
+  <aside id="sidebar">
+    <div class="nav-tabs">
+      <div class="nav-tab active" data-tab="control">Control</div>
+      <div class="nav-tab" data-tab="config">Config</div>
+      <div class="nav-tab" data-tab="channels">Channels</div>
+      <div class="nav-tab" data-tab="keywords">Keywords</div>
+      <div class="nav-tab" data-tab="stats">Stats</div>
+      <div class="nav-tab" data-tab="deals">Deals</div>
+      <div class="nav-tab" data-tab="sync">☁ Sync</div>
+    </div>
+
+    <!-- CONTROL TAB -->
+    <div class="tab-content active" id="tab-control">
+      <div class="control-card">
+        <div id="uptime-display">00:00:00</div>
+        <button id="btn-start" class="btn btn-primary btn-full">
+          ▶ Start Monitor
+        </button>
+        <button id="btn-stop" class="btn btn-danger btn-full" style="display:none">
+          ■ Stop Monitor
+        </button>
+      </div>
+
+      <div class="section-title">Notifications</div>
+
+      <div class="field-group">
+        <label>Ntfy Topic</label>
+        <input type="text" id="ctrl-ntfy-topic" placeholder="your-unique-topic">
+        <div class="field-hint">Open Ntfy app → subscribe to this topic</div>
+      </div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Discord DM Alerts</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-dm" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Phone (Ntfy) Alerts</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-ntfy" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+
+      <button id="btn-test-ntfy" class="btn btn-ghost btn-sm">
+        📱 Send Test Notification
+      </button>
+
+      <div class="section-title">Sound</div>
+      <div class="sound-controls">
+        <label>Volume</label>
+        <div class="volume-row">
+          <span class="volume-icon">🔊</span>
+          <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="70">
+          <span class="volume-value" id="volume-value">70%</span>
+        </div>
+        <label>Alert Sound</label>
+        <div class="sound-preset-row">
+          <button class="sound-preset-btn active" data-sound="chime">🔔 Chime</button>
+          <button class="sound-preset-btn" data-sound="urgent">🚨 Urgent</button>
+          <button class="sound-preset-btn" data-sound="cash">💰 Cash</button>
+          <button class="sound-preset-btn" data-sound="ding">🛎 Ding</button>
+        </div>
+      </div>
+
+      <div class="section-title">Webhooks</div>
+      <div class="field-hint" style="margin-bottom:6px">Send alerts to Slack, Telegram, or any URL</div>
+      <div class="tag-input-wrap" style="flex-direction:column; gap:6px">
+        <input type="text" id="new-webhook-name" placeholder="Name (e.g. Slack)">
+        <input type="text" id="new-webhook-url" placeholder="https://hooks.slack.com/...">
+        <button id="btn-add-webhook" class="btn btn-ghost btn-sm">+ Add Webhook</button>
+      </div>
+      <div id="webhook-list" style="display:flex; flex-direction:column; gap:4px; margin-top:6px"></div>
+    </div>
+
+    <!-- CONFIG TAB -->
+    <div class="tab-content" id="tab-config">
+      <div class="section-title">Discord</div>
+
+      <div class="field-group">
+        <label>Your Token</label>
+        <div class="token-field">
+          <input type="password" id="cfg-token" placeholder="Your Discord user token" autocomplete="off">
+          <span class="token-show-btn" id="token-show-btn">show</span>
+        </div>
+        <div class="field-hint">Browser → F12 → Application → Local Storage → discord.com → token</div>
+      </div>
+
+      <div class="field-group">
+        <label>Your User ID</label>
+        <input type="text" id="cfg-user-id" placeholder="Your Discord user ID" inputmode="numeric">
+        <div class="field-hint">Settings → Advanced → Developer Mode ON → right-click your name → Copy User ID</div>
+      </div>
+
+      <div class="section-title">Cooldown</div>
+
+      <div class="field-group">
+        <label>Cooldown (seconds)</label>
+        <input type="number" id="cfg-cooldown" value="30" min="5" max="3600">
+        <div class="field-hint">Min seconds between alerts for the same keyword</div>
+      </div>
+
+      <div class="section-title">Ntfy</div>
+
+      <div class="field-group">
+        <label>Ntfy Server</label>
+        <input type="text" id="cfg-ntfy-server" value="https://ntfy.sh">
+      </div>
+
+      <button id="btn-save-config" class="btn btn-primary btn-full">💾 Save Settings</button>
+      <span id="auto-save-indicator">✓ Saved</span>
+    </div>
+
+    <!-- CHANNELS TAB -->
+    <div class="tab-content" id="tab-channels">
+      <div class="section-title">Monitored Channels</div>
+      <div class="field-hint" style="margin-bottom:8px">Enable Developer Mode in Discord → right-click channel → Copy Channel ID</div>
+      
+      <div class="control-card" style="margin-bottom:12px">
+        <div style="font-size:11px; line-height:1.6; color:var(--text)">
+          <strong style="color:var(--accent2)">Monitor Modes:</strong><br>
+          <span style="color:var(--accent2)">● Keywords Only</span> — alerts only when keywords match<br>
+          <span style="color:var(--yellow)">● All Posts</span> — alerts on EVERY message (perfect for exclusive deal drops)<br>
+          Click the badge to toggle modes.
+        </div>
+      </div>
+
+      <div class="tag-input-wrap" style="flex-direction:column; gap:6px">
+        <input type="text" id="new-channel-id" placeholder="Channel ID (e.g. 1234567890)" inputmode="numeric">
+        <input type="text" id="new-channel-name" placeholder="Label (e.g. pokemon-deals)">
+        <button id="btn-add-channel" class="btn btn-primary btn-sm">+ Add Channel</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="channel-list" id="channel-list">
+        <div style="color:var(--muted); font-size:11px; text-align:center; padding:16px 0">No channels added yet</div>
+      </div>
+    </div>
+
+    <!-- KEYWORDS TAB -->
+    <div class="tab-content" id="tab-keywords">
+      <div class="section-title">Keyword Groups</div>
+      <div class="field-hint" style="margin-bottom:8px">Organize keywords by category for color-coded alerts</div>
+
+      <div id="keyword-groups-container"></div>
+
+      <div class="tag-input-wrap" style="margin-top:8px">
+        <input type="text" id="new-group-name" placeholder="Group name..." style="flex:1">
+        <input type="color" id="new-group-color" value="#5865f2" style="width:34px; height:30px; padding:2px; background:var(--panel); border:1px solid var(--border); border-radius:4px; cursor:pointer">
+        <button id="btn-add-group" class="btn btn-ghost btn-sm">+ Group</button>
+      </div>
+
+      <div class="divider" style="margin:10px 0"></div>
+
+      <div class="section-title">All Keywords</div>
+      <div class="field-hint" style="margin-bottom:8px">Alerts fire when ANY keyword is found (case-insensitive)</div>
+
+      <div class="tag-input-wrap">
+        <input type="text" id="new-keyword" placeholder="Add keyword..." style="flex:1">
+        <select id="keyword-priority-select" style="width:70px; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:4px; font-size:10px; font-family:var(--font-mono)">
+          <option value="medium">Med</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+        <button id="btn-add-keyword" class="btn btn-primary btn-sm">+</button>
+      </div>
+
+      <div class="tag-list" id="keyword-list"></div>
+    </div>
+
+    <!-- STATS TAB -->
+    <div class="tab-content" id="tab-stats">
+      <div class="section-title">Session Summary</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-session-alerts">0</div>
+          <div class="stat-label">Alerts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-session-msgs">0</div>
+          <div class="stat-label">Messages</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-alerts-hour">0</div>
+          <div class="stat-label">Alerts/hr</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-all">0</div>
+          <div class="stat-label">All Time</div>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:8px">Alerts (24h)</div>
+      <canvas id="alerts-chart" width="496" height="100" style="width:100%; height:100px; border-radius:6px; background:var(--panel); border:1px solid var(--border)"></canvas>
+
+      <div class="section-title" style="margin-top:8px">Top Keywords</div>
+      <div id="top-keywords-list" class="stats-list">
+        <div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">No data yet</div>
+      </div>
+
+      <div class="section-title" style="margin-top:8px">Active Channels</div>
+      <div id="top-channels-list" class="stats-list">
+        <div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">No data yet</div>
+      </div>
+
+      <div class="section-title" style="margin-top:12px">Quick Calculator</div>
+      <div class="control-card">
+        <div class="row">
+          <div class="field-group">
+            <label>Buy $</label>
+            <input type="number" id="calc-buy" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="field-group">
+            <label>Sell $</label>
+            <input type="number" id="calc-sell" placeholder="0.00" step="0.01" min="0">
+          </div>
+        </div>
+        <div id="calc-result" class="calc-result">Enter prices above</div>
+        <div class="row">
+          <div class="stat-card" style="padding:8px">
+            <div class="stat-value" style="font-size:16px; color:var(--green)" id="calc-session-profit">$0</div>
+            <div class="stat-label">Session Profit</div>
+          </div>
+          <div class="stat-card" style="padding:8px">
+            <div class="stat-value" style="font-size:16px" id="calc-items-count">0</div>
+            <div class="stat-label">Flips Logged</div>
+          </div>
+        </div>
+        <button id="btn-add-flip" class="btn btn-ghost btn-sm btn-full">+ Log This Flip</button>
+        <div id="flip-log-viewer" class="flip-log-viewer"></div>
+        <button id="btn-clear-flips" class="btn btn-ghost btn-sm btn-full" style="margin-top:4px;display:none">🗑 Clear Flip Log</button>
+      </div>
+
+      <div class="section-title" style="margin-top:12px">Alert History</div>
+      <div class="control-card">
+        <div id="history-list" class="history-list">
+          <div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">Loading...</div>
+        </div>
+        <div class="history-controls">
+          <button id="btn-history-prev" class="btn btn-ghost" disabled>← Prev</button>
+          <span id="history-page-info" class="history-page-info">Page 1</span>
+          <button id="btn-history-next" class="btn btn-ghost">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEALS TAB (sidebar controls) -->
+    <div class="tab-content" id="tab-deals">
+      <div class="section-title">Deal Analyzer</div>
+      <div class="field-hint" style="margin-bottom:8px">Analyzes your alerts against eBay sold prices to find the most profitable flips.</div>
+
+      <div class="control-card">
+        <div style="font-size:11px; line-height:1.6; color:var(--text)">
+          <strong style="color:var(--accent2)">How it works:</strong><br>
+          1. Your alerts are parsed for product info<br>
+          2. Click <strong>Check eBay</strong> to fetch sold prices<br>
+          3. Cards show profit potential per item
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:10px">Filter by Source</div>
+      <div id="deals-retailer-filters" style="display:flex;flex-wrap:wrap;gap:4px">
+        <button class="deals-filter-btn active" data-retailer="all">All</button>
+        <button class="deals-filter-btn" data-retailer="amazon">Amazon</button>
+        <button class="deals-filter-btn" data-retailer="walmart">Walmart</button>
+        <button class="deals-filter-btn" data-retailer="target">Target</button>
+        <button class="deals-filter-btn" data-retailer="other">Other</button>
+      </div>
+
+      <div class="section-title" style="margin-top:10px">Sort</div>
+      <select id="deals-sort" class="deals-sort-select" style="width:100%">
+        <option value="newest">Newest First</option>
+        <option value="profit-high">Highest Profit</option>
+        <option value="profit-low">Lowest Price</option>
+        <option value="roi">Best ROI %</option>
+      </select>
+
+      <button id="btn-deals-refresh" class="btn btn-primary btn-full" style="margin-top:12px">🔄 Refresh Deals</button>
+      <button id="btn-deals-lookup-all" class="btn btn-ghost btn-full" style="margin-top:4px">📊 Lookup All eBay Prices</button>
+      <div class="field-hint" style="margin-top:4px">eBay lookup may take a few seconds per item</div>
+    </div>
+
+    <!-- SYNC TAB -->
+    <div class="tab-content" id="tab-sync">
+      <div class="section-title">☁️ Cloud Sync</div>
+      <div class="field-hint" style="margin-bottom:8px">Sync alerts, deals & config across devices via Firebase. Back up & restore your data.</div>
+
+      <!-- Setup -->
+      <div class="control-card">
+        <div class="field-group">
+          <label>Firebase Database URL</label>
+          <input type="text" id="sync-firebase-url" placeholder="https://your-project-default-rtdb.firebaseio.com" style="font-size:10px">
+        </div>
+        <div class="field-group">
+          <label>Device Name</label>
+          <input type="text" id="sync-device-name" placeholder="My Desktop">
+        </div>
+        <div style="display:flex;gap:4px;margin-top:8px">
+          <button id="btn-sync-test" class="btn btn-ghost btn-sm" style="flex:1">🔗 Test</button>
+          <button id="btn-sync-save" class="btn btn-primary btn-sm" style="flex:1">💾 Save</button>
+        </div>
+        <div id="sync-test-result" style="font-size:10px;margin-top:6px;display:none;padding:6px 8px;border-radius:4px"></div>
+      </div>
+
+      <!-- Sync Toggle -->
+      <div class="section-title" style="margin-top:10px">Auto-Sync</div>
+      <div class="control-card">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:var(--text)">Enable Auto-Sync</span>
+          <label class="switch" style="position:relative;display:inline-block;width:36px;height:20px">
+            <input type="checkbox" id="toggle-auto-sync" style="opacity:0;width:0;height:0">
+            <span class="switch-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border2);border-radius:20px;transition:.2s"></span>
+          </label>
+        </div>
+        <div class="field-group" style="margin-top:8px">
+          <label>Interval (minutes)</label>
+          <input type="number" id="sync-interval" value="5" min="1" max="60" style="width:80px">
+        </div>
+      </div>
+
+      <!-- Manual Sync Buttons -->
+      <div class="section-title" style="margin-top:10px">Manual Sync</div>
+      <div style="display:flex;gap:4px">
+        <button id="btn-sync-push" class="btn btn-primary btn-sm" style="flex:1">⬆ Push to Cloud</button>
+        <button id="btn-sync-pull" class="btn btn-ghost btn-sm" style="flex:1">⬇ Pull from Cloud</button>
+      </div>
+
+      <!-- Backup/Restore -->
+      <div class="section-title" style="margin-top:10px">Backup & Restore</div>
+      <div style="display:flex;gap:4px">
+        <button id="btn-sync-backup" class="btn btn-ghost btn-sm" style="flex:1">💾 Export Backup</button>
+        <button id="btn-sync-restore" class="btn btn-ghost btn-sm" style="flex:1">📥 Import Backup</button>
+      </div>
+      <input type="file" id="sync-restore-file" accept=".json" style="display:none">
+
+      <!-- Status -->
+      <div class="section-title" style="margin-top:10px">Sync Status</div>
+      <div class="control-card" id="sync-status-card">
+        <div style="font-size:11px;color:var(--text);line-height:2">
+          <div>Status: <span id="sync-status-indicator" style="color:var(--muted)">Not configured</span></div>
+          <div>Last Push: <span id="sync-last-push" style="color:var(--accent2)">Never</span></div>
+          <div>Last Pull: <span id="sync-last-pull" style="color:var(--accent2)">Never</span></div>
+          <div>Local Alerts: <span id="sync-local-count" style="color:var(--text)">0</span></div>
+          <div>Cloud Alerts: <span id="sync-cloud-count" style="color:var(--cyan)">—</span></div>
+        </div>
+      </div>
+
+      <!-- Connected Devices -->
+      <div class="section-title" style="margin-top:10px">Connected Devices</div>
+      <div id="sync-device-list" style="font-size:11px;color:var(--muted)">No devices connected</div>
+
+      <!-- Setup Guide -->
+      <details style="margin-top:12px;font-size:10px;color:var(--muted)">
+        <summary style="cursor:pointer;color:var(--accent2);font-weight:600;margin-bottom:6px">📖 How to set up Firebase (free)</summary>
+        <ol style="padding-left:16px;line-height:1.8;color:var(--text)">
+          <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener" style="color:var(--accent2)">Firebase Console</a></li>
+          <li>Click <strong>Create a project</strong> (any name)</li>
+          <li>Go to <strong>Build → Realtime Database</strong></li>
+          <li>Click <strong>Create Database</strong></li>
+          <li>Choose location, click <strong>Next</strong></li>
+          <li>Select <strong>"Start in test mode"</strong>, click <strong>Enable</strong></li>
+          <li>Copy the database URL (looks like <code>https://xxx.firebaseio.com</code>)</li>
+          <li>Paste it above and click <strong>Test</strong> → <strong>Save</strong></li>
+        </ol>
+      </details>
+    </div>
+  </aside>
+
+  <!-- ── MAIN LOG AREA ── -->
+  <main id="main">
+    <div class="log-toolbar">
+      <div class="log-toolbar-left">
+        <div class="filter-tabs">
+          <div class="filter-tab" data-filter="all">All</div>
+          <div class="filter-tab active" data-filter="alert">🔔 Discord Messages</div>
+          <div class="filter-tab" data-filter="error">Errors</div>
+        </div>
+        <div class="search-input-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="log-search" placeholder="Search logs...">
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <button id="btn-sound" class="btn btn-ghost btn-sm toggle-active" title="Toggle sound alerts">🔔</button>
+        <button id="btn-notifs" class="btn btn-ghost btn-sm toggle-active" title="Toggle desktop notifications">🖥</button>
+        <div class="toolbar-divider"></div>
+        <button id="btn-refresh-now" class="btn btn-ghost btn-sm" title="Refresh feed">↻</button>
+        <div id="live-indicator" class="live-indicator">Realtime</div>
+        <div id="refresh-status" class="refresh-status">Waiting...</div>
+        <button id="btn-clear-logs" class="btn btn-ghost btn-sm" title="Clear logs">🗑</button>
+      </div>
+    </div>
+
+    <div id="log-container">
+      <div id="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">Waiting for activity</div>
+        <div class="empty-sub">Configure your token and channels,<br>then press Start to begin monitoring.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── DEALS ANALYZER MAIN ── -->
+  <div id="deals-container">
+    <div class="deals-toolbar">
+      <div class="deals-toolbar-left">
+        <span class="deals-title-bar">💰 Deal Analyzer</span>
+        <span class="deals-count" id="deals-count-label"></span>
+      </div>
+      <div class="deals-toolbar-right">
+        <input type="text" id="deals-search" placeholder="Search deals..." style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:5px 10px;width:140px;outline:none">
+      </div>
+    </div>
+    <div class="deals-scroll">
+      <div id="deals-grid" class="deals-grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  running: false,
+  alertCount: 0,
+  filter: 'alert',
+  searchQuery: '',
+  logs: [],
+  channels: [],
+  keywords: [],
+  config: {},
+  uptimeInterval: null,
+  startTime: null,
+  manualStarted: false,
+  lastTopId: 0,
+  lastPollOk: 0,
+  soundEnabled: true,
+  notifsEnabled: true,
+  // New state
+  alertVolume: parseFloat(localStorage.getItem('dm_volume') || '0.28'), // 0.28 = 70% of max 0.4
+  alertSoundPreset: localStorage.getItem('dm_sound_preset') || 'chime',
+  keywordPriorities: {},    // keyword -> "high" | "medium" | "low"
+  keywordGroups: {},        // groupName -> {color, keywords: []}
+  webhooks: [],             // [{url, name, enabled}]
+  flipLog: JSON.parse(localStorage.getItem('dm_flip_log') || '[]'),
+  statsInterval: null,
+};
+
+// ── API ────────────────────────────────────────────────────────────────────
+const api = {
+  async get(path) {
+    const r = await fetch(path, { cache: 'no-store' });
+    return r.json();
+  },
+  async post(path, data) {
+    const r = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      cache: 'no-store'
+    });
+    return r.json();
+  }
+};
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', dur = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), dur);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+function stripDiscordMentions(s) {
+  return (s || '').replace(/<@[!&]?\d+>/g, '').replace(/\s{2,}/g,' ').trim();
+}
+function extractMarkdownLinks(line) {
+  const out = []; const rx = /\[+([^\]]+)\]+\((https?[^\)]+)\)/g; let m;
+  while ((m = rx.exec(line)) !== null) out.push({ label: m[1].replace(/^\[+|\]+$/g,''), url: m[2] });
+  return out;
+}
+function detectRetailer(url) {
+  if (!url) return null;
+  if (/amazon\./i.test(url))         return { name: 'Amazon',      cls: 'rt-amazon',  icon: '🅰' };
+  if (/walmart\./i.test(url))        return { name: 'Walmart',     cls: 'rt-walmart', icon: '🏪' };
+  if (/target\./i.test(url))         return { name: 'Target',      cls: 'rt-target',  icon: '🎯' };
+  if (/barnesandnoble\./i.test(url)) return { name: 'B&N',         cls: 'rt-bn',      icon: '📚' };
+  if (/lego\./i.test(url))           return { name: 'LEGO',        cls: 'rt-lego',    icon: '🧱' };
+  if (/goto\.walmart|affil\.walmart/i.test(url)) return { name: 'Walmart', cls: 'rt-walmart', icon: '🏪' };
+  return null;
+}
+function minutesAgo(isoStr) {
+  if (!isoStr) return 999;
+  try { return (Date.now() - new Date(isoStr).getTime()) / 60000; } catch(_) { return 999; }
+}
+
+function formatTimeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 5) return 'just now';
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+// ── Product ID Extraction (ASIN / TCIN / SKU) ──────────────────────────────
+const _pidResolveCache = {}; // url -> { data, ts }
+const _PID_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const _PID_CACHE_MAX = 200;
+
+function extractProductIds(content, links) {
+  const ids = { asins: [], tcins: [], skus: [], resolvableLinks: [] };
+  const text = content || '';
+  const allLinks = links || [];
+
+  // Extract ASINs from content text (B0 + 8 alphanumeric)
+  const asinRx = /\b(B0[A-Z0-9]{8})\b/g;
+  let m;
+  while ((m = asinRx.exec(text)) !== null) {
+    if (!ids.asins.includes(m[1])) ids.asins.push(m[1]);
+  }
+
+  // Extract ASINs from Amazon URLs in links
+  for (const url of allLinks) {
+    const asinMatch = url.match(/amazon\.com.*\/(?:dp|gp\/product)\/([A-Z0-9]{10})/);
+    if (asinMatch && !ids.asins.includes(asinMatch[1])) ids.asins.push(asinMatch[1]);
+
+    // Target TCINs from URLs
+    const tcinMatch = url.match(/A-(\d{7,9})/);
+    if (tcinMatch && !ids.tcins.includes(tcinMatch[1])) ids.tcins.push(tcinMatch[1]);
+
+    // Mark redirect URLs that need resolving (dmflip.com, amzn.to)
+    try {
+      const host = new URL(url).hostname;
+      if (/dmflip\.com|amzn\.to/i.test(host)) {
+        ids.resolvableLinks.push(url);
+      }
+    } catch(_) {}
+  }
+
+  // Extract Target TCINs from content
+  const tcinRx = /A-(\d{7,9})/g;
+  while ((m = tcinRx.exec(text)) !== null) {
+    if (!ids.tcins.includes(m[1])) ids.tcins.push(m[1]);
+  }
+
+  return ids;
+}
+
+function renderProductIdsHtml(ids, alertId) {
+  if (!ids) return '';
+  const hasIds = ids.asins.length || ids.tcins.length || ids.skus?.length;
+  const hasResolvable = ids.resolvableLinks?.length > 0;
+  if (!hasIds && !hasResolvable) return '';
+
+  let chips = '';
+
+  for (const asin of ids.asins) {
+    chips += `<span class="pid-chip asin" data-copy="${asin}" title="Click to copy ASIN. Right-click to open Amazon."><span class="pid-icon">🅰</span> ${asin}<span class="pid-copy">📋</span></span>`;
+  }
+  for (const tcin of ids.tcins) {
+    chips += `<span class="pid-chip tcin" data-copy="${tcin}" title="Click to copy TCIN"><span class="pid-icon">🎯</span> ${tcin}<span class="pid-copy">📋</span></span>`;
+  }
+  if (ids.skus) {
+    for (const sku of ids.skus) {
+      chips += `<span class="pid-chip sku-id" data-copy="${sku}" title="Click to copy SKU"><span class="pid-icon">🏷</span> ${sku}<span class="pid-copy">📋</span></span>`;
+    }
+  }
+
+  // Show resolved URLs from cache (with TTL check)
+  const _now = Date.now();
+  for (const url of (ids.resolvableLinks || [])) {
+    const entry = _pidResolveCache[url];
+    const cached = (entry && _now - entry.ts < _PID_CACHE_TTL) ? entry.data : null;
+    if (cached && cached.asin && !ids.asins.includes(cached.asin)) {
+      chips += `<span class="pid-chip asin" data-copy="${cached.asin}" title="Resolved from ${escHtml(url)}"><span class="pid-icon">🅰</span> ${cached.asin}<span class="pid-copy">📋</span></span>`;
+    }
+    if (cached && cached.product_url) {
+      chips += `<span class="pid-chip url-chip" data-copy="${escHtml(cached.product_url)}" title="Click to copy full URL">${escHtml(cached.product_url.substring(0, 60))}${cached.product_url.length > 60 ? '...' : ''}<span class="pid-copy">📋</span></span>`;
+    }
+  }
+
+  // Resolve button if there are unresolved redirect links
+  const unresolvedCount = (ids.resolvableLinks || []).filter(u => {
+    const e = _pidResolveCache[u];
+    return !e || _now - e.ts >= _PID_CACHE_TTL;
+  }).length;
+  const resolveBtn = unresolvedCount > 0
+    ? `<button class="pid-resolve-btn" data-alert-id="${alertId || ''}" data-urls="${escHtml(JSON.stringify(ids.resolvableLinks))}">🔗 Resolve ${unresolvedCount} link${unresolvedCount > 1 ? 's' : ''}</button>`
+    : '';
+
+  return `<div class="product-ids-row">
+    <div class="pid-label">Product IDs ${resolveBtn}</div>
+    ${chips}
+  </div>`;
+}
+
+async function resolveProductUrls(urls) {
+  try {
+    const data = await api.post('/api/resolve-url', { urls });
+    if (data.resolved) {
+      // Evict oldest entries if cache is too large
+      const keys = Object.keys(_pidResolveCache);
+      if (keys.length > _PID_CACHE_MAX) {
+        keys.sort((a, b) => (_pidResolveCache[a].ts || 0) - (_pidResolveCache[b].ts || 0));
+        for (let i = 0; i < keys.length - _PID_CACHE_MAX + Object.keys(data.resolved).length; i++) {
+          delete _pidResolveCache[keys[i]];
+        }
+      }
+      for (const [url, info] of Object.entries(data.resolved)) {
+        _pidResolveCache[url] = { data: info, ts: Date.now() };
+      }
+    }
+    return data;
+  } catch(e) {
+    return { error: String(e) };
+  }
+}
+
+// ── Structured content parser ────────────────────────────────────────────────
+function parseStructuredContent(raw) {
+  if (!raw) return null;
+
+  // Separate Discord mention lines from real content for live-alert format detection
+  const allLines = raw.split('\n').map(l => l.trim());
+  const lines = allLines.filter(l => l);
+
+  const result = {
+    title: '', fields: [], atcUrl: null, links: [], quickLinks: [],
+    price: null, recommendedPrice: null, orderLimit: null, sku: null,
+    seller: null, type: null, variants: [],
+    bodyLines: [],   // free-text lines (for live-alerts)
+    productUrls: [], // direct non-Discord product URLs found in body
+  };
+
+  const knownKeys = new Set([
+    'sku','price','order limit','offer id','seller','add to cart',
+    'recommended price','quick tasks','links','asin','quantity',
+    'condition','list price','deal price','savings','category',
+    'rank','rating','reviews','in stock','prime','fulfilled by',
+    'type','variants','cart','tags',
+  ]);
+
+  // Detect live-alert format: starts with role mentions + # heading
+  const isLiveAlert = lines.some(l => /^#\s+/.test(l)) || (lines[0] && lines[0].startsWith('<@'));
+
+  if (isLiveAlert) {
+    let heading = '';
+    for (const line of lines) {
+      const clean = stripDiscordMentions(line);
+      if (/^#+\s+/.test(line)) { heading = line.replace(/^#+\s+/, ''); continue; }
+      if (!clean) continue;
+      // Collect URLs
+      const rx = /\[+([^\]]+)\]+\((https?[^\)]+)\)/g; let m;
+      while ((m = rx.exec(line)) !== null) {
+        if (/atc|add to cart/i.test(m[1])) result.atcUrl = m[2];
+        else result.links.push({ label: m[1], url: m[2] });
+      }
+      // Plain URLs
+      const words = clean.split(/\s+/);
+      for (const w of words) {
+        if (/^https?:\/\//.test(w)) {
+          const url = w.replace(/[.,)>\]]+$/, '');
+          if (!/discord\.com\/channels/.test(url)) result.productUrls.push(url);
+        }
+      }
+      // Body text (clean, no pure-mention lines, no raw URLs)
+      const textOnly = clean.replace(/https?:\/\/\S+/g, '').replace(/\[+[^\]]+\]+\([^)]+\)/g,'').trim();
+      if (textOnly && !/^<@/.test(line)) result.bodyLines.push(textOnly);
+    }
+    result.title = heading || result.bodyLines.shift() || '';
+    return result;
+  }
+
+  let i = 0;
+  // First non-key, non-mention line is the title
+  while (i < lines.length) {
+    const candidate = stripDiscordMentions(lines[i]);
+    if (candidate && !knownKeys.has(candidate.toLowerCase())) {
+      result.title = candidate;
+      i++;
+      break;
+    }
+    i++;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const lower = line.toLowerCase();
+
+    if (knownKeys.has(lower)) {
+      const val = lines[i + 1] || '';
+
+      if (lower === 'add to cart') {
+        const ms = extractMarkdownLinks(val);
+        if (ms.length) result.atcUrl = ms[0].url;
+        else if (/^https?/.test(val)) result.atcUrl = val;
+        i += 2; continue;
+      }
+      if (lower === 'links' || lower === 'cart') {
+        const nextLine = lines[i + 1] || '';
+        const lks = extractMarkdownLinks(nextLine);
+        if (lks.length) result.quickLinks.push(...lks);
+        else {
+          // "Links" value might be on the same line separated by " - "
+          const sameLine = line.replace(/^links\s*/i,'');
+          result.quickLinks.push(...extractMarkdownLinks(sameLine));
+        }
+        i += 2; continue;
+      }
+      if (lower === 'quick tasks') {
+        result.quickLinks.push(...extractMarkdownLinks(lines[i + 1] || ''));
+        i += 2; continue;
+      }
+      if (lower === 'variants') {
+        // Variants can span multiple lines until next known key
+        let j = i + 1;
+        while (j < lines.length && !knownKeys.has(lines[j].toLowerCase())) {
+          const vlinks = extractMarkdownLinks(lines[j]);
+          if (vlinks.length) result.variants.push(...vlinks);
+          else if (lines[j] && !/^```/.test(lines[j])) result.variants.push({ label: lines[j], url: null });
+          j++;
+        }
+        i = j; continue;
+      }
+      if (lower === 'offer id') { i += 2; continue; }
+
+      if (val && !knownKeys.has(val.toLowerCase()) && !/^```/.test(val)) {
+        // Store special fields separately for rich display
+        if (lower === 'price') result.price = val;
+        else if (lower === 'recommended price') result.recommendedPrice = val;
+        else if (lower === 'order limit') result.orderLimit = val;
+        else if (lower === 'sku') result.sku = val;
+        else if (lower === 'seller') result.seller = val;
+        else if (lower === 'type') result.type = val;
+        // Always also push to fields for generic display
+        if (!['price','recommended price','order limit','sku','seller','type'].includes(lower)) {
+          result.fields.push({ key: line, value: val });
+        }
+        i += 2;
+      } else {
+        i++;
+      }
+    } else {
+      // Free-form line — extract links
+      const lks = extractMarkdownLinks(line);
+      for (const lk of lks) {
+        if (/atc|add to cart/i.test(lk.label)) result.atcUrl = lk.url;
+        else result.links.push(lk);
+      }
+      i++;
+    }
+  }
+  return result;
+}
+
+// ── Log rendering ──────────────────────────────────────────────────────────
+const levelIcons = { alert: '🔔', success: '✅', error: '❌', warning: '⚠️', info: '◦' };
+
+function renderLog(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const { filter, searchQuery } = S;
+  if (filter !== 'all' && entry.level !== filter) return null;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    const haystack = (entry.message + JSON.stringify(entry.details)).toLowerCase();
+    if (!haystack.includes(q)) return null;
+  }
+
+  const div = document.createElement('div');
+  const isFresh = entry.level === 'alert' && minutesAgo(entry.details?.created_at || entry.details?.timestamp) < 1.5;
+  const priority = entry.details?.priority || 'medium';
+  const priClass = entry.level === 'alert' ? ` priority-${priority}` : '';
+  div.className = `log-entry level-${entry.level}${isFresh ? ' is-fresh' : ''}${priClass}`;
+  div.dataset.id = entry.id;
+
+  let detailsHTML = '';
+  if (entry.level === 'alert' && entry.details) {
+    const d = entry.details;
+    const p = parseStructuredContent(d.content || '');
+
+    // ── Age / NEW badge ────────────────────────────────────────────────────
+    const ageMin = minutesAgo(d.created_at || d.timestamp);
+    const newBadge = ageMin < 5 ? `<span class="badge-new">NEW</span>` : '';
+
+    // ── Timestamp + time-ago ────────────────────────────────────────────────
+    let timeStr = entry.time || '';
+    let timeAgoStr = '';
+    const alertTs = d.created_at || d.timestamp;
+    if (alertTs) {
+      try {
+        const dt = new Date(alertTs);
+        if (!isNaN(dt)) {
+          timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          timeAgoStr = formatTimeAgo(dt);
+        }
+      } catch(_) {}
+    }
+
+    // ── Priority badge ──────────────────────────────────────────────────────
+    const alertPriority = d.priority || 'medium';
+    const priorityBadge = alertPriority === 'high'
+      ? '<span class="priority-badge p-high">URGENT</span>'
+      : alertPriority === 'low' ? '<span class="priority-badge p-low">LOW</span>' : '';
+
+    // ── Source pills ───────────────────────────────────────────────────────
+    const serverPill  = d.server  ? `<span class="meta-pill server">${escHtml(d.server)}</span>` : '';
+    const channelPill = d.channel ? `<span class="meta-pill channel">#${escHtml(d.channel)}</span>` : '';
+    const kwPills = (d.keywords||[]).filter(k=>k!=='[monitor all]').map(k => {
+      const grp = findKeywordGroup(k);
+      const style = grp ? `style="border-color:${grp.color}; color:${grp.color}"` : '';
+      return `<span class="meta-pill kw" ${style}>${escHtml(k)}</span>`;
+    }).join('');
+    const authorPill = d.author ? `<span class="meta-pill author">👤 ${escHtml(d.author)}</span>` : '';
+
+    // ── Title ──────────────────────────────────────────────────────────────
+    const rawTitle = (p && p.title) || (d.content||'').split('\n')[0].replace(/^#+\s*/,'') || '(no content)';
+    const title = stripDiscordMentions(rawTitle).replace(/^#+\s*/,'') || '(no content)';
+
+    // ── Retailer badge ─────────────────────────────────────────────────────
+    const atcUrl = p && p.atcUrl;
+    const retailer = detectRetailer(atcUrl || (d.links||[]).find(u => !/discord\.com|cdn\.discord/i.test(u)) || '');
+    const retailerBadge = retailer ? `<span class="retailer-badge ${retailer.cls}">${retailer.icon} ${retailer.name}</span>` : '';
+
+    // ── Type badge ─────────────────────────────────────────────────────────
+    const typeBadge = (p && p.type) ? `<span class="type-badge">${escHtml(p.type)}</span>` : '';
+
+    // ── Price row ──────────────────────────────────────────────────────────
+    let priceHTML = '';
+    if (p && p.price) {
+      const priceVal = p.price.replace(/[^\d.–\-\/\s]/g,'').trim() || p.price;
+      let savingsHTML = '';
+      if (p.recommendedPrice) {
+        try {
+          const cur = parseFloat(p.price.replace(/[^0-9.]/g,''));
+          const rec = parseFloat(p.recommendedPrice.replace(/[^0-9.]/g,''));
+          if (rec > cur && rec > 0) {
+            const pct = Math.round((rec - cur) / rec * 100);
+            savingsHTML = `<span class="price-was">was ${escHtml(p.recommendedPrice)}</span><span class="price-save">−${pct}%</span>`;
+          }
+        } catch(_) {}
+      }
+      const limitNum = p.orderLimit ? parseInt(p.orderLimit) : null;
+      let limitBadge = '';
+      if (limitNum !== null && !isNaN(limitNum)) {
+        const cls = limitNum <= 1 ? 'limit-red' : limitNum <= 3 ? 'limit-orange' : 'limit-gray';
+        const icon = limitNum <= 1 ? '🚨' : limitNum <= 3 ? '⚠️' : '🔢';
+        limitBadge = `<span class="order-limit ${cls}">${icon} Limit ${limitNum}</span>`;
+      } else if (p.orderLimit) {
+        limitBadge = `<span class="order-limit limit-gray">🔢 Limit ${escHtml(p.orderLimit)}</span>`;
+      }
+      priceHTML = `<div class="ac-price-row">
+        <span class="price-main">${escHtml(p.price)}</span>
+        ${savingsHTML}${limitBadge}
+      </div>`;
+    }
+
+    // ── SKU / Seller info pills ────────────────────────────────────────────
+    const infoPills = [
+      p && p.sku    ? `<span class="info-pill">SKU <b>${escHtml(p.sku)}</b></span>` : '',
+      p && p.seller ? `<span class="info-pill">📦 ${escHtml(p.seller)}</span>` : '',
+      ...((p && p.fields)||[]).map(f => `<span class="info-pill">${escHtml(f.key)}: <b>${escHtml(f.value)}</b></span>`),
+    ].filter(Boolean).join('');
+    const infoRow = infoPills ? `<div class="ac-info-row">${infoPills}</div>` : '';
+
+    // ── Variants ──────────────────────────────────────────────────────────
+    let variantsHTML = '';
+    if (p && p.variants.length) {
+      variantsHTML = `<div class="ac-variants"><span class="variants-label">Variants:</span>${
+        p.variants.map(v => v.url
+          ? `<a class="variant-btn" href="${escHtml(v.url)}" target="_blank" rel="noopener">${escHtml(v.label)}</a>`
+          : `<span class="variant-btn no-link">${escHtml(v.label)}</span>`
+        ).join('')}</div>`;
+    }
+
+    // ── Body text (live-alert commentary) ─────────────────────────────────
+    let bodyHTML = '';
+    if (p && p.bodyLines.length) {
+      bodyHTML = `<div class="ac-body">${p.bodyLines.map(l => escHtml(l)).join('<br>')}</div>`;
+    }
+
+    // ── Product image ──────────────────────────────────────────────────────
+    const isImgUrl = u => /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(u) || /walmartimages|media-amazon|images-bn|cdn\.discordapp|prodimage/i.test(u);
+    const imgs = (d.image_urls||[]).filter(u => u && !/(gif|svg)$/i.test(u)).slice(0,3);
+    const imgHTML = imgs.length
+      ? `<div class="alert-images">${imgs.map(u=>`<a href="${escHtml(u)}" target="_blank" rel="noopener"><img class="alert-img" src="${escHtml(u)}" alt="product" loading="lazy"></a>`).join('')}</div>`
+      : '';
+
+    // ── Action buttons ────────────────────────────────────────────────────
+    const atcBtn = atcUrl
+      ? `<a class="btn-atc" href="${escHtml(atcUrl)}" target="_blank" rel="noopener">🛒 Add to Cart</a>`
+      : '';
+
+    // Product URLs from live-alert body (show as "View Deal" buttons)
+    const productBtns = (p && p.productUrls||[]).filter((u,i,a)=>a.indexOf(u)===i).slice(0,3).map(u => {
+      const rt = detectRetailer(u);
+      const label = rt ? `${rt.icon} ${rt.name}` : '🔗 View Deal';
+      return `<a class="btn-deal" href="${escHtml(u)}" target="_blank" rel="noopener">${label}</a>`;
+    }).join('');
+
+    // Quick links merged
+    const isDiscordUrl = u => /discord\.com\/channels/i.test(u);
+    const backendLinks = (d.links||[]).filter(u => u && !isImgUrl(u) && !isDiscordUrl(u))
+      .map(u => { try { return { label: new URL(u).hostname.replace(/^www\./,''), url: u }; } catch(_) { return null; } })
+      .filter(Boolean);
+    const allLinks = [...(p ? p.quickLinks : []), ...(p ? p.links : []), ...backendLinks];
+    const uniqueLinks = allLinks.filter((l,i,a) => l.url && a.findIndex(x=>x.url===l.url)===i).slice(0,12);
+    const qlinksHTML = uniqueLinks.length ? `<div class="alert-qlinks">${uniqueLinks.map(l => {
+      let cls = 'qlink';
+      const lb = l.label.toLowerCase();
+      if (/ebay/i.test(lb))          cls += ' qlink-ebay';
+      else if (/amazon/i.test(lb))   cls += ' qlink-amazon';
+      else if (/walmart/i.test(lb))  cls += ' qlink-walmart';
+      else if (/target/i.test(lb))   cls += ' qlink-target';
+      else if (/keepa/i.test(lb))    cls += ' qlink-keepa';
+      else if (/selleramp|sas\./i.test(lb)) cls += ' qlink-selleramp';
+      else if (/lightning/i.test(lb)) cls += ' qlink-lightning';
+      else if (/google/i.test(lb))   cls += ' qlink-google';
+      return `<a class="${cls}" href="${escHtml(l.url)}" target="_blank" rel="noopener">${escHtml(l.label)}</a>`;
+    }).join('')}</div>` : '';
+
+    const discordBtn = d.jump_url
+      ? `<a class="qlink qlink-discord" href="${escHtml(d.jump_url)}" target="_blank" rel="noopener">↗ Discord</a>`
+      : '';
+
+    // ── Copy title button ────────────────────────────────────────────────────
+    const copyTitleBtn = title && title !== '(no content)'
+      ? `<button class="btn-copy-title" data-copy-text="${escHtml(title)}" title="Copy title to clipboard">📋 Copy</button>`
+      : '';
+
+    // ── Auto search buttons from title ──────────────────────────────────────
+    const searchTitle = encodeURIComponent((title || '').substring(0, 120).trim());
+    const searchBtns = searchTitle ? `
+      <a class="qlink qlink-ebay" href="https://www.ebay.com/sch/i.html?_nkw=${searchTitle}" target="_blank" rel="noopener">🔍 eBay</a>
+      <a class="qlink qlink-amazon" href="https://www.amazon.com/s?k=${searchTitle}" target="_blank" rel="noopener">🔍 Amazon</a>
+      <a class="qlink qlink-keepa" href="https://keepa.com/#!search/1-${searchTitle}" target="_blank" rel="noopener">📊 Keepa</a>
+    ` : '';
+
+    // ── Product IDs (ASIN/TCIN) ──────────────────────────────────────────────
+    const productIds = extractProductIds(d.content || '', d.links || []);
+    // Also add SKU from parsed content if it looks like an ASIN
+    if (p && p.sku) {
+      if (/^B0[A-Z0-9]{8}$/.test(p.sku) && !productIds.asins.includes(p.sku)) {
+        productIds.asins.push(p.sku);
+      } else if (/^\d{7,12}$/.test(p.sku) && !productIds.tcins.includes(p.sku)) {
+        productIds.skus = productIds.skus || [];
+        if (!productIds.skus.includes(p.sku)) productIds.skus.push(p.sku);
+      }
+    }
+    const productIdsHTML = renderProductIdsHtml(productIds, entry.id);
+
+    const cardCls = d.jump_url ? 'alert-card clickable' : 'alert-card';
+    const jumpAttr = d.jump_url ? `data-jump-url="${escHtml(d.jump_url)}"` : '';
+
+    detailsHTML = `
+      <div class="${cardCls}" ${jumpAttr}>
+        <div class="ac-top">
+          <div class="ac-top-left">
+            <div class="ac-meta">${priorityBadge}${newBadge}${serverPill}${channelPill}${authorPill}${kwPills}</div>
+            <div class="ac-title-row">
+              <span class="ac-title">${escHtml(title)}</span>
+              ${retailerBadge}${typeBadge}
+            </div>
+            ${priceHTML}
+            ${infoRow}
+            ${productIdsHTML}
+            ${bodyHTML}
+            ${variantsHTML}
+            <div class="ac-time">🕐 ${escHtml(timeStr)}${timeAgoStr ? ` <span class="ac-time-ago${ageMin < 2 ? ' recent' : ageMin > 30 ? ' stale' : ''}" data-ts="${escHtml(alertTs)}">(${timeAgoStr})</span>` : ''}</div>
+          </div>
+          ${imgHTML ? `<div class="ac-top-right">${imgHTML}</div>` : ''}
+        </div>
+        <div class="ac-actions">${atcBtn}${productBtns}${copyTitleBtn}${qlinksHTML}${discordBtn}${searchBtns}</div>
+      </div>`;
+  }
+
+  div.innerHTML = `
+    <div class="log-time">${entry.time || ''}</div>
+    <div class="log-icon">${levelIcons[entry.level] || '◦'}</div>
+    <div class="log-body">
+      <div class="log-message">${escHtml(entry.message)}</div>
+      ${detailsHTML}
+    </div>`;
+
+  return div;
+}
+
+function renderFallbackLog(entry) {
+  const div = document.createElement('div');
+  const level = (entry && entry.level) ? String(entry.level) : 'info';
+  const time  = (entry && entry.time)  ? String(entry.time)  : '--:--:--';
+  const msg   = (entry && entry.message) ? String(entry.message) : '[invalid log entry]';
+  div.className = `log-entry level-${level}`;
+  div.innerHTML = `<div class="log-time">${escHtml(time)}</div><div class="log-icon">${levelIcons[level]||'◦'}</div><div class="log-body"><div class="log-message">${escHtml(msg)}</div></div>`;
+  return div;
+}
+
+function entryMatchesActiveView(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const { filter, searchQuery } = S;
+  if (filter !== 'all' && entry.level !== filter) return false;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    const hay = `${entry.message||''}${JSON.stringify(entry.details||{})}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+
+function rebuildLogs() {
+  const container = document.getElementById('log-container');
+  if (!container) return;
+
+  if (S.logs.length === 0) {
+    const hasToken = S.config && S.config.token && !S.config.token.includes('***');
+    const hasChannels = S.channels && S.channels.length > 0;
+    let emptyIcon = '📡', emptyTitle = 'Waiting for activity', emptySub = '', emptyAction = '';
+    if (!hasToken && !hasChannels) {
+      emptyIcon = '🔧'; emptyTitle = 'Setup Required';
+      emptySub = 'Add your Discord token in Config, then add channels to monitor.';
+      emptyAction = '<button class="empty-state-action" onclick="document.querySelector(\'[data-tab=config]\').click()">Open Config →</button>';
+    } else if (!hasChannels) {
+      emptyIcon = '📺'; emptyTitle = 'No Channels Added';
+      emptySub = 'Add Discord channel IDs to start monitoring for deals.';
+      emptyAction = '<button class="empty-state-action" onclick="document.querySelector(\'[data-tab=channels]\').click()">Add Channels →</button>';
+    } else if (!S.running) {
+      emptyIcon = '⏸'; emptyTitle = 'Monitor is Offline';
+      emptySub = `Ready to monitor ${S.channels.length} channel${S.channels.length > 1 ? 's' : ''} with ${S.keywords.length} keywords. Press Start!`;
+      emptyAction = '<button class="empty-state-action" onclick="document.getElementById(\'btn-start\').click()">▶ Start Monitor</button>';
+    } else {
+      emptySub = 'Monitoring is active. Alerts will appear here as keywords are matched.';
+    }
+    container.innerHTML = `<div id="empty-state"><div class="empty-icon">${emptyIcon}</div><div class="empty-title">${emptyTitle}</div><div class="empty-sub">${emptySub}</div>${emptyAction}</div>`;
+    return;
+  }
+
+  let count = 0;
+  const frag = document.createDocumentFragment();
+  for (const entry of S.logs) {
+    let el = null;
+    try { el = renderLog(entry); } catch(_) { el = renderFallbackLog(entry); }
+    if (el) { frag.appendChild(el); count++; }
+  }
+
+  container.innerHTML = '';
+  if (count > 0) {
+    container.appendChild(frag);
+  } else {
+    container.innerHTML = `<div style="text-align:center;color:var(--muted);padding:40px;font-size:12px">No logs match the current filter.</div>`;
+  }
+}
+
+// ── Single poll loop (replaces SSE + 4 overlapping timers) ─────────────────
+let _pollBusy = false;
+
+async function pollOnce() {
+  if (_pollBusy) return;
+  _pollBusy = true;
+  try {
+    const [statusData, logData] = await Promise.all([
+      api.get('/api/status'),
+      api.get('/api/logs')
+    ]);
+
+    // Status
+    if (statusData.running !== S.running) updateStatus(statusData.running);
+    S.manualStarted = !!statusData.running;
+    syncStartTime(statusData.start_time);
+    if (!statusData.running) updateUptimeDisplay('—');
+
+    // Live counters
+    const msgsEl = document.getElementById('h-msgs');
+    if (msgsEl) msgsEl.textContent = statusData.messages_seen || 0;
+    if (statusData.last_alert_at) {
+      try {
+        const dt = new Date(statusData.last_alert_at);
+        const lastEl = document.getElementById('h-last');
+        const chipEl = document.getElementById('h-last-chip');
+        if (lastEl) lastEl.textContent = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        if (chipEl) chipEl.style.display = '';
+      } catch(_) {}
+    }
+
+    // Logs — only rebuild when data actually changes
+    const logs = Array.isArray(logData.logs) ? logData.logs : [];
+    const newTopId = logs.length ? logs[0].id : 0;
+    const newCount = typeof logData.alert_count === 'number' ? logData.alert_count : (statusData.alert_count || 0);
+
+    if (newTopId !== S.lastTopId || newCount !== S.alertCount) {
+      S.logs = logs;
+      S.lastTopId = newTopId;
+      updateAlertCount(newCount);
+      rebuildLogs();
+      // Auto-refresh deals view when new alerts come in
+      if (_dealsState.activeView === 'deals') {
+        loadDeals();
+      }
+    }
+
+    S.lastPollOk = Date.now();
+    setFeedStatus('live');
+  } catch(_) {
+    setFeedStatus('error');
+  } finally {
+    _pollBusy = false;
+  }
+}
+
+function setFeedStatus(state) {
+  const el = document.getElementById('refresh-status');
+  const ind = document.getElementById('live-indicator');
+  if (!el || !ind) return;
+  if (state === 'live') {
+    el.className = 'refresh-status live'; el.textContent = 'Live';
+    ind.classList.remove('syncing'); ind.textContent = 'Realtime';
+  } else {
+    el.className = 'refresh-status stale'; el.textContent = 'Reconnecting...';
+    ind.classList.add('syncing'); ind.textContent = 'Sync';
+  }
+}
+
+// ── Channel rendering ──────────────────────────────────────────────────────
+function renderChannels() {
+  const list = document.getElementById('channel-list');
+  if (S.channels.length === 0) {
+    list.innerHTML = `<div style="color:var(--muted);font-size:11px;text-align:center;padding:16px 0">No channels added yet</div>`;
+    return;
+  }
+  list.innerHTML = S.channels.map((ch, i) => {
+    const mode = ch.mode || 'keywords';
+    const modeLabel = mode === 'all' ? 'All Posts' : 'Keywords Only';
+    const modeClass = mode === 'all' ? 'mode-all' : 'mode-keywords';
+    return `
+    <div class="channel-item">
+      <div class="channel-info">
+        <span class="channel-name"># ${escHtml(ch.name || ch.id)}</span>
+        <span class="channel-id">${ch.id}</span>
+      </div>
+      <div class="channel-controls">
+        <span class="mode-badge ${modeClass}" data-idx="${i}">${modeLabel}</span>
+        <span class="channel-remove" data-idx="${i}">✕</span>
+      </div>
+    </div>`
+  }).join('');
+}
+
+// ── Keyword rendering ──────────────────────────────────────────────────────
+function renderKeywords() {
+  const list = document.getElementById('keyword-list');
+  const groupNames = Object.keys(S.keywordGroups || {});
+  list.innerHTML = S.keywords.map((kw, i) => {
+    const pri = S.keywordPriorities[kw] || 'medium';
+    const grp = findKeywordGroup(kw);
+    const borderStyle = grp ? `border-left:3px solid ${grp.color};` : '';
+    const priIcon = pri === 'high' ? '🚨' : pri === 'low' ? '🔇' : '';
+    const priTitle = pri !== 'medium' ? `title="Priority: ${pri}"` : '';
+    // Group assignment dropdown
+    const groupSelect = groupNames.length ? `<span class="tag-group-assign">
+      <select class="tag-group-select" data-kw="${escHtml(kw)}" title="Assign to group">
+        <option value="">—</option>
+        ${groupNames.map(g => `<option value="${escHtml(g)}"${grp && grp.name === g ? ' selected' : ''}>${escHtml(g)}</option>`).join('')}
+      </select>
+    </span>` : '';
+    return `<div class="tag" style="${borderStyle}" ${priTitle} data-idx="${i}" data-priority="${pri}">
+      ${priIcon}${escHtml(kw)}${groupSelect}
+      <span class="tag-priority" data-idx="${i}" style="cursor:pointer;font-size:10px;color:var(--muted);margin:0 2px" title="Click to cycle priority">${pri === 'high' ? '▲' : pri === 'low' ? '▼' : '●'}</span>
+      <span class="tag-remove" data-idx="${i}">✕</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Status update ──────────────────────────────────────────────────────────
+function updateStatus(running) {
+  S.running = running;
+  const badge = document.getElementById('status-badge');
+  const text = document.getElementById('status-text');
+  const btnStart = document.getElementById('btn-start');
+  const btnStop = document.getElementById('btn-stop');
+  const uptime = document.getElementById('uptime-display');
+
+  badge.className = 'status-badge ' + (running ? 'running' : '');
+  text.textContent = running ? 'Live' : 'Offline';
+  btnStart.style.display = running ? 'none' : '';
+  btnStop.style.display = running ? '' : 'none';
+  uptime.classList.toggle('visible', running);
+
+  if (!running && S.uptimeInterval) {
+    clearInterval(S.uptimeInterval);
+    S.uptimeInterval = null;
+  }
+  if (!running) {
+    S.startTime = null;
+    updateUptimeDisplay('—');
+  } else {
+    startUptimeTicker();
+  }
+}
+
+let _uptimeEl, _uptimeChipEl;
+function updateUptimeDisplay(uptime) {
+  if (!_uptimeEl) _uptimeEl = document.getElementById('uptime-display');
+  if (!_uptimeChipEl) _uptimeChipEl = document.getElementById('h-uptime');
+  const value = uptime || '—';
+  _uptimeEl.textContent = value;
+  _uptimeChipEl.textContent = value;
+}
+
+function formatUptime(totalSeconds) {
+  const safe = Math.max(0, Math.floor(totalSeconds || 0));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function startUptimeTicker() {
+  if (S.uptimeInterval || !S.startTime || !S.running) return;
+  S.uptimeInterval = setInterval(() => {
+    if (!S.running || !S.startTime) return;
+    const secs = (Date.now() - S.startTime) / 1000;
+    updateUptimeDisplay(formatUptime(secs));
+  }, 1000);
+}
+
+function syncStartTime(isoTime) {
+  if (!isoTime) return;
+  const ms = Date.parse(isoTime);
+  if (!Number.isFinite(ms)) return;
+  S.startTime = ms;
+  if (S.running) {
+    updateUptimeDisplay(formatUptime((Date.now() - S.startTime) / 1000));
+    startUptimeTicker();
+  }
+}
+
+function updateAlertCount(n) {
+  const isNew = n > S.alertCount;
+  S.alertCount = n;
+  document.getElementById('h-alerts').textContent = n;
+
+  // Tab title badge
+  document.title = n > 0 ? `(${n}) Drop Scout` : 'Drop Scout';
+
+  if (isNew) {
+    // Flash the alerts chip
+    const chip = document.querySelector('#h-alerts')?.closest('.chip');
+    if (chip) { chip.classList.remove('flash'); void chip.offsetWidth; chip.classList.add('flash'); }
+
+    // Sound + desktop notification (pass priority from newest alert)
+    const newestAlert = S.logs.find(l => l.level === 'alert' && l.details);
+    const alertPri = newestAlert?.details?.priority || 'medium';
+    playAlertSound(alertPri);
+    sendDesktopNotification();
+
+    // Scroll feed to top so newest alert is visible
+    requestAnimationFrame(() => {
+      const c = document.getElementById('log-container');
+      if (c) c.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+}
+
+// ── Keyword group helper ──────────────────────────────────────────────────
+function findKeywordGroup(keyword) {
+  const kw = (keyword || '').toLowerCase();
+  for (const [name, grp] of Object.entries(S.keywordGroups || {})) {
+    if ((grp.keywords || []).map(k => k.toLowerCase()).includes(kw)) {
+      return { name, color: grp.color || '#5865f2' };
+    }
+  }
+  return null;
+}
+
+// ── Stats dashboard ─────────────────────────────────────────────────────────
+async function fetchStats() {
+  try {
+    const data = await api.get('/api/stats');
+    const el = id => document.getElementById(id);
+    if (el('stat-session-alerts')) el('stat-session-alerts').textContent = data.session_alerts || 0;
+    if (el('stat-session-msgs')) el('stat-session-msgs').textContent = data.session_messages || 0;
+    if (el('stat-total-all')) el('stat-total-all').textContent = data.total_alerts || 0;
+
+    // Alerts per hour
+    const totalHourly = data.hourly.reduce((s, h) => s + h.count, 0);
+    const activeHours = data.hourly.filter(h => h.count > 0).length || 1;
+    if (el('stat-alerts-hour')) el('stat-alerts-hour').textContent = (totalHourly / activeHours).toFixed(1);
+
+    renderHourlyChart(data.hourly);
+
+    // Top keywords
+    const kwContainer = el('top-keywords-list');
+    const maxKw = data.top_keywords[0]?.count || 1;
+    if (kwContainer) {
+      kwContainer.innerHTML = data.top_keywords.length ? data.top_keywords.slice(0, 8).map(k => `
+        <div class="stats-list-item">
+          <span class="kw-name">${escHtml(k.keyword)}</span>
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(k.count/maxKw*100)}%"></div></div>
+          <span class="count">${k.count}</span>
+        </div>
+      `).join('') : '<div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">No data yet</div>';
+    }
+
+    // Top channels
+    const chContainer = el('top-channels-list');
+    const maxCh = data.top_channels[0]?.count || 1;
+    if (chContainer) {
+      chContainer.innerHTML = data.top_channels.length ? data.top_channels.slice(0, 5).map(c => `
+        <div class="stats-list-item">
+          <span class="kw-name">#${escHtml(c.channel)}</span>
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(c.count/maxCh*100)}%"></div></div>
+          <span class="count">${c.count}</span>
+        </div>
+      `).join('') : '<div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">No data yet</div>';
+    }
+  } catch(_) {}
+}
+
+function renderHourlyChart(hourly) {
+  const canvas = document.getElementById('alerts-chart');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const max = Math.max(...hourly.map(d => d.count), 1);
+  const barW = (w - 16) / 24;
+  const barGap = 2;
+
+  hourly.forEach((d, i) => {
+    const barH = Math.max((d.count / max) * (h - 22), d.count > 0 ? 3 : 0);
+    const x = 8 + i * barW;
+    const y = h - 16 - barH;
+
+    // Bar with gradient
+    if (d.count > 0) {
+      const grad = ctx.createLinearGradient(x, y, x, y + barH);
+      grad.addColorStop(0, 'rgba(88,101,242,0.9)');
+      grad.addColorStop(1, 'rgba(88,101,242,0.4)');
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    }
+    const bx = x + barGap/2, bw = barW - barGap, r = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, y);
+    ctx.lineTo(bx + bw - r, y);
+    ctx.quadraticCurveTo(bx + bw, y, bx + bw, y + r);
+    ctx.lineTo(bx + bw, y + barH);
+    ctx.lineTo(bx, y + barH);
+    ctx.lineTo(bx, y + r);
+    ctx.quadraticCurveTo(bx, y, bx + r, y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Hour label every 4 hours
+    if (i % 4 === 0) {
+      ctx.fillStyle = '#4a5270';
+      ctx.font = '9px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.hour.replace(':00','h'), x + barW/2, h - 3);
+    }
+  });
+}
+
+// ── Alert history browser ────────────────────────────────────────────────────
+let _historyPage = 0;
+const HISTORY_PER_PAGE = 15;
+
+async function fetchHistory() {
+  try {
+    const offset = _historyPage * HISTORY_PER_PAGE;
+    const data = await api.get(`/api/history?limit=${HISTORY_PER_PAGE}&offset=${offset}`);
+    const container = document.getElementById('history-list');
+    const pageInfo = document.getElementById('history-page-info');
+    const prevBtn = document.getElementById('btn-history-prev');
+    const nextBtn = document.getElementById('btn-history-next');
+    if (!container) return;
+
+    const total = data.total || 0;
+    const totalPages = Math.max(1, Math.ceil(total / HISTORY_PER_PAGE));
+
+    if (pageInfo) pageInfo.textContent = `Page ${_historyPage + 1} of ${totalPages} (${total} total)`;
+    if (prevBtn) prevBtn.disabled = _historyPage <= 0;
+    if (nextBtn) nextBtn.disabled = (_historyPage + 1) >= totalPages;
+
+    if (!data.alerts || !data.alerts.length) {
+      container.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">No alert history yet</div>';
+      return;
+    }
+
+    container.innerHTML = data.alerts.map(alert => {
+      const d = alert.details || {};
+      const p = parseStructuredContent(d.content || '');
+      const title = (p && p.title) ? stripDiscordMentions(p.title).substring(0, 80) : d.channel || 'Alert';
+      const ts = d.timestamp || alert.time || '';
+      let timeDisplay = alert.time || '';
+      try {
+        const dt = new Date(ts);
+        if (!isNaN(dt)) timeDisplay = dt.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch(_) {}
+      const kws = (d.keywords || []).filter(k => k !== '[monitor all]').slice(0, 3).join(', ');
+      const pri = d.priority || 'medium';
+      const priDot = pri === 'high' ? '🔴' : pri === 'low' ? '⚪' : '🟡';
+      return `<div class="history-item" data-jump="${escHtml(d.jump_url || '')}">
+        <div class="history-item-title">${priDot} ${escHtml(title)}</div>
+        <div class="history-item-meta">
+          <span>${escHtml(timeDisplay)}</span>
+          ${d.channel ? `<span>#${escHtml(d.channel)}</span>` : ''}
+          ${kws ? `<span>${escHtml(kws)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(_) {
+    const container = document.getElementById('history-list');
+    if (container) container.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:10px">Could not load history</div>';
+  }
+}
+
+// ── Flip log viewer ─────────────────────────────────────────────────────────
+function renderFlipLog() {
+  const viewer = document.getElementById('flip-log-viewer');
+  const clearBtn = document.getElementById('btn-clear-flips');
+  if (!viewer) return;
+  if (!S.flipLog.length) {
+    viewer.innerHTML = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    return;
+  }
+  if (clearBtn) clearBtn.style.display = '';
+  viewer.innerHTML = S.flipLog.slice().reverse().slice(0, 20).map(f => {
+    const profit = f.profit || (f.sell - f.buy);
+    const cls = profit >= 0 ? 'positive' : 'negative';
+    let timeStr = '';
+    try { timeStr = new Date(f.time).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch(_) {}
+    return `<div class="flip-entry">
+      <span>$${f.buy.toFixed(2)} → $${f.sell.toFixed(2)}</span>
+      <span>${timeStr}</span>
+      <span class="flip-profit ${cls}">${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Profit calculator ────────────────────────────────────────────────────────
+function updateCalcResult() {
+  const buy = parseFloat(document.getElementById('calc-buy')?.value) || 0;
+  const sell = parseFloat(document.getElementById('calc-sell')?.value) || 0;
+  const el = document.getElementById('calc-result');
+  if (!el) return;
+  if (buy > 0 && sell > 0) {
+    const profit = sell - buy;
+    const roi = ((profit / buy) * 100).toFixed(0);
+    const color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+    el.innerHTML = `<span class="calc-profit" style="color:${color}">${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}</span><span class="calc-roi">${roi}% ROI</span>`;
+  } else {
+    el.textContent = 'Enter prices above';
+  }
+}
+
+function updateFlipTotals() {
+  const total = S.flipLog.reduce((s, f) => s + (f.profit || 0), 0);
+  const el1 = document.getElementById('calc-session-profit');
+  const el2 = document.getElementById('calc-items-count');
+  if (el1) el1.textContent = `$${total.toFixed(2)}`;
+  if (el2) el2.textContent = S.flipLog.length;
+}
+
+// ── Keyword groups rendering ─────────────────────────────────────────────────
+function renderKeywordGroups() {
+  const container = document.getElementById('keyword-groups-container');
+  if (!container) return;
+  const groups = S.keywordGroups || {};
+  const entries = Object.entries(groups);
+  if (!entries.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:8px 0;text-align:center">No groups yet. Add one below.</div>';
+    return;
+  }
+  container.innerHTML = entries.map(([name, grp]) => `
+    <div class="keyword-group">
+      <div class="keyword-group-header">
+        <span class="keyword-group-name">
+          <span class="keyword-group-dot" style="background:${escHtml(grp.color || '#5865f2')}"></span>
+          ${escHtml(name)} <span class="keyword-group-count">(${(grp.keywords||[]).length})</span>
+        </span>
+        <div class="keyword-group-actions">
+          <span class="channel-remove" data-group="${escHtml(name)}" title="Delete group">✕</span>
+        </div>
+      </div>
+      <div class="tag-list">
+        ${(grp.keywords||[]).map(kw => `<div class="tag grouped" style="border-left-color:${escHtml(grp.color || '#5865f2')}">${escHtml(kw)} <span class="tag-remove" data-group="${escHtml(name)}" data-kw="${escHtml(kw)}">✕</span></div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Webhook rendering ────────────────────────────────────────────────────────
+function renderWebhooks() {
+  const list = document.getElementById('webhook-list');
+  if (!list) return;
+  if (!S.webhooks.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:10px;text-align:center;padding:8px 0">No webhooks configured</div>';
+    return;
+  }
+  list.innerHTML = S.webhooks.map((wh, i) => `
+    <div class="webhook-item${wh.enabled === false ? ' disabled' : ''}">
+      <label class="webhook-toggle" title="${wh.enabled !== false ? 'Enabled' : 'Disabled'}">
+        <input type="checkbox" data-wh-toggle="${i}" ${wh.enabled !== false ? 'checked' : ''}>
+        <div class="wh-track"></div>
+        <div class="wh-thumb"></div>
+      </label>
+      <span class="wh-name">${escHtml(wh.name || 'Webhook')}</span>
+      <span class="wh-url">${escHtml(wh.url || '').substring(0, 35)}...</span>
+      <span class="channel-remove" data-wh-idx="${i}" title="Remove">✕</span>
+    </div>
+  `).join('');
+}
+
+// ── Auto-save ────────────────────────────────────────────────────────────────
+let _autoSaveTimer = null;
+function scheduleAutoSave() {
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(async () => {
+    await saveConfig();
+    showSaveIndicator();
+  }, 1500);
+}
+
+function showSaveIndicator() {
+  const el = document.getElementById('auto-save-indicator');
+  if (el) {
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 2000);
+  }
+}
+
+// ── Load initial state ─────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    // Load config
+    const cfg = await api.get('/api/config/full');
+    S.config = cfg;
+    S.keywords = [...(cfg.keywords || [])];
+    S.channels = (cfg.channels || []).map(c => {
+      if (typeof c === 'object') {
+        return {
+          id: c.id,
+          name: c.name || c.id,
+          mode: c.mode || 'keywords'  // Default to keywords if missing
+        };
+      }
+      return { id: String(c), name: String(c), mode: 'keywords' };
+    });
+
+    // Fill form fields
+    document.getElementById('cfg-token').value = cfg.token || '';
+    document.getElementById('cfg-user-id').value = cfg.user_id || '';
+    document.getElementById('cfg-cooldown').value = cfg.cooldown || 30;
+    document.getElementById('cfg-ntfy-server').value = cfg.ntfy_server || 'https://ntfy.sh';
+    document.getElementById('ctrl-ntfy-topic').value = cfg.ntfy_topic || '';
+    document.getElementById('toggle-dm').checked = cfg.discord_dm !== false;
+    document.getElementById('toggle-ntfy').checked = cfg.ntfy_enabled !== false;
+    // Prevent stale/autofilled search from hiding all logs.
+    const searchEl = document.getElementById('log-search');
+    if (searchEl) searchEl.value = '';
+    S.searchQuery = '';
+
+    // Load new config fields
+    S.keywordPriorities = cfg.keyword_priorities || {};
+    S.keywordGroups = cfg.keyword_groups || {};
+    S.webhooks = cfg.webhooks || [];
+
+    renderChannels();
+    renderKeywords();
+    renderKeywordGroups();
+    renderWebhooks();
+    updateFlipTotals();
+    renderFlipLog();
+
+    // Apply saved sound preferences
+    const volSlider = document.getElementById('volume-slider');
+    if (volSlider) volSlider.value = Math.round((S.alertVolume / 0.4) * 100);
+    document.querySelectorAll('.sound-preset-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.sound === S.alertSoundPreset);
+    });
+
+    // Fetch stats
+    fetchStats();
+
+    // Load status (preserve server state so context survives refresh/reopen)
+    const status = await api.get('/api/status');
+    updateStatus(status.running);
+    S.manualStarted = !!status.running;
+    syncStartTime(status.start_time);
+    if (!status.running) updateUptimeDisplay('—');
+    updateAlertCount(status.alert_count || 0);
+
+    // Load logs
+    const logData = await api.get('/api/logs');
+    const initLogs = Array.isArray(logData.logs) ? logData.logs : [];
+    S.logs = initLogs;
+    S.lastTopId = initLogs.length ? initLogs[0].id : 0;
+    updateAlertCount(logData.alert_count || 0);
+    rebuildLogs();
+
+  } catch(e) {
+    toast('Could not connect to server. Is the Drop Scout server running?', 'error', 6000);
+  }
+}
+
+// ── Audio alert ────────────────────────────────────────────────────────────
+let _audioCtx = null;
+const SOUND_PRESETS = {
+  chime:  { tones: [[880,0,0.12],[1320,0.13,0.12]], wave: 'sine' },
+  urgent: { tones: [[880,0,0.08],[1100,0.09,0.08],[880,0.18,0.08],[1100,0.27,0.08]], wave: 'square' },
+  cash:   { tones: [[523,0,0.1],[659,0.11,0.1],[784,0.22,0.15]], wave: 'sine' },
+  ding:   { tones: [[1046,0,0.25]], wave: 'triangle' },
+};
+
+function playAlertSound(priority) {
+  if (!S.soundEnabled) return;
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _audioCtx;
+    const vol = S.alertVolume;
+    // Use urgent preset for high priority regardless of user setting
+    const presetKey = (priority === 'high') ? 'urgent' : (S.alertSoundPreset || 'chime');
+    const preset = SOUND_PRESETS[presetKey] || SOUND_PRESETS.chime;
+    preset.tones.forEach(([freq, start, dur]) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = preset.wave;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.05);
+    });
+  } catch(_) {}
+}
+
+// ── Desktop notifications ───────────────────────────────────────────────────
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+function sendDesktopNotification() {
+  if (!S.notifsEnabled) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const newest = S.logs.find(l => l.level === 'alert' && l.details);
+    if (!newest) return;
+    const d = newest.details;
+    const p = parseStructuredContent(d.content || '');
+    const title = (p && p.title) ? stripDiscordMentions(p.title) : d.channel || 'New Alert';
+    const body  = [
+      p && p.price   ? `💰 ${p.price}` : '',
+      p && p.orderLimit ? `⚠️ Limit ${p.orderLimit}` : '',
+      `#${d.channel || ''}`,
+    ].filter(Boolean).join('  ·  ');
+    const notif = new Notification(`🔔 ${title}`, { body, icon: '/favicon.ico', tag: 'dm-alert' });
+    notif.onclick = () => { window.focus(); notif.close(); };
+    setTimeout(() => notif.close(), 8000);
+  } catch(_) {}
+}
+
+// ── Keyboard shortcuts ──────────────────────────────────────────────────────
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', e => {
+    // Don't hijack when user is typing
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (e.key === 'a' || e.key === 'A') {
+      // Open newest ATC link
+      e.preventDefault();
+      const alert = S.logs.find(l => l.level === 'alert' && l.details);
+      if (alert) {
+        const p = parseStructuredContent(alert.details.content || '');
+        if (p && p.atcUrl) { window.open(p.atcUrl, '_blank'); toast('⚡ Opening ATC...', 'success', 1500); }
+        else toast('No ATC link on newest alert', 'info', 1500);
+      }
+    }
+    if (e.key === 'd' || e.key === 'D') {
+      // Open newest Discord jump
+      e.preventDefault();
+      const alert = S.logs.find(l => l.level === 'alert' && l.details && l.details.jump_url);
+      if (alert) { window.open(alert.details.jump_url, '_blank'); toast('↗ Opening Discord...', 'info', 1500); }
+    }
+    if (e.key === 'Escape') {
+      // Clear search
+      const s = document.getElementById('log-search');
+      if (s && s.value) { s.value = ''; S.searchQuery = ''; rebuildLogs(); }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEALS ANALYZER
+// ══════════════════════════════════════════════════════════════════════════════
+
+const _dealsState = {
+  deals: [],           // processed deal objects
+  ebayCache: {},       // title -> {avg, median, ...}
+  filter: 'all',       // retailer filter
+  sort: 'newest',      // sort mode
+  search: '',          // search query
+  activeView: 'logs',  // 'logs' or 'deals'
+};
+
+function detectRetailerFromText(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (/amazon|amzn/.test(t))       return { key:'amazon',  name:'Amazon',  cls:'rt-amazon',  icon:'🅰' };
+  if (/walmart|wmt/.test(t))       return { key:'walmart', name:'Walmart', cls:'rt-walmart', icon:'🏪' };
+  if (/target\.com|target\s/.test(t)) return { key:'target',  name:'Target',  cls:'rt-target',  icon:'🎯' };
+  if (/barnesandnoble|b&n/.test(t))return { key:'bn',      name:'B&N',     cls:'rt-bn',      icon:'📚' };
+  if (/lego\.com|lego\s/.test(t))  return { key:'lego',    name:'LEGO',    cls:'rt-lego',    icon:'🧱' };
+  return null;
+}
+
+function processAlertsIntoDeals(alerts) {
+  const seen = new Map(); // title -> deal
+  for (const alert of alerts) {
+    const d = alert.details || {};
+    const p = parseStructuredContent(d.content || '');
+    const rawTitle = (p && p.title) ? stripDiscordMentions(p.title).replace(/^#+\s*/,'') : '';
+    const title = rawTitle.substring(0, 150).trim();
+    if (!title || title === '(no content)') continue;
+
+    // Detect retailer from URLs and content
+    const allText = (d.content || '') + ' ' + (d.links || []).join(' ');
+    const retailer = detectRetailerFromText(allText) || detectRetailer((d.links||[])[0]) || { key:'other', name:'Unknown', cls:'rt-other', icon:'📦' };
+
+    // Extract buy price
+    let buyPrice = null;
+    if (p && p.price) {
+      const m = p.price.match(/[\d,]+\.?\d*/);
+      if (m) buyPrice = parseFloat(m[0].replace(/,/g, ''));
+    }
+
+    // Extract image
+    const img = (d.image_urls || [])[0] || null;
+
+    // Use jump_url as unique key, fallback to title
+    const key = title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 60);
+    if (seen.has(key)) {
+      // Update existing deal with newer data if available
+      const existing = seen.get(key);
+      if (!existing.img && img) existing.img = img;
+      if (!existing.buyPrice && buyPrice) existing.buyPrice = buyPrice;
+      existing.alertCount++;
+      continue;
+    }
+
+    seen.set(key, {
+      key,
+      title,
+      buyPrice,
+      img,
+      retailer,
+      channel: d.channel || '',
+      server: d.server || '',
+      timestamp: d.timestamp || alert.time || '',
+      jumpUrl: d.jump_url || '',
+      atcUrl: (p && p.atcUrl) || '',
+      links: d.links || [],
+      content: d.content || '',
+      sku: (p && p.sku) || '',
+      alertCount: 1,
+      ebayData: null, // filled by lookup
+    });
+  }
+  return Array.from(seen.values());
+}
+
+async function loadDeals() {
+  try {
+    const data = await api.get('/api/history?limit=500&offset=0');
+    const alerts = data.alerts || [];
+    _dealsState.deals = processAlertsIntoDeals(alerts);
+    // Restore cached eBay data
+    for (const deal of _dealsState.deals) {
+      if (_dealsState.ebayCache[deal.key]) {
+        deal.ebayData = _dealsState.ebayCache[deal.key];
+      }
+    }
+    renderDeals();
+  } catch(_) {}
+}
+
+const EBAY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function ebayLookup(deal, forceRefresh = false) {
+  // Check cache validity — expire after 30 min so prices stay current
+  if (!forceRefresh && deal.ebayData && deal.ebayData.count > 0) {
+    const fetchedAt = deal.ebayData.fetched_at ? new Date(deal.ebayData.fetched_at).getTime() : 0;
+    if (Date.now() - fetchedAt < EBAY_CACHE_TTL) return deal.ebayData;
+  }
+  try {
+    const data = await api.post('/api/ebay-lookup', { query: deal.title });
+    deal.ebayData = data;
+    _dealsState.ebayCache[deal.key] = data;
+    return data;
+  } catch(e) {
+    return { error: String(e), prices: [], avg: 0, count: 0 };
+  }
+}
+
+function getDealProfit(deal) {
+  if (!deal.buyPrice || !deal.ebayData || !deal.ebayData.median) return null;
+  const sell = deal.ebayData.median;
+  const fees = sell * 0.13; // ~13% eBay+PayPal fees estimate
+  const shipping = 5; // rough shipping estimate
+  const profit = sell - fees - shipping - deal.buyPrice;
+  const roi = deal.buyPrice > 0 ? (profit / deal.buyPrice * 100) : 0;
+  return { profit: Math.round(profit * 100) / 100, roi: Math.round(roi), sell, fees: Math.round(fees * 100) / 100 };
+}
+
+function filterAndSortDeals() {
+  let deals = [..._dealsState.deals];
+  // Filter by retailer
+  if (_dealsState.filter !== 'all') {
+    deals = deals.filter(d => d.retailer.key === _dealsState.filter);
+  }
+  // Filter by search
+  if (_dealsState.search) {
+    const q = _dealsState.search.toLowerCase();
+    deals = deals.filter(d => d.title.toLowerCase().includes(q) || d.channel.toLowerCase().includes(q));
+  }
+  // Sort — deals WITH profit data sort first; those without go to the bottom sorted by timestamp
+  switch (_dealsState.sort) {
+    case 'newest':
+      deals.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      break;
+    case 'profit-high': {
+      deals.sort((a, b) => {
+        const pa = getDealProfit(a), pb = getDealProfit(b);
+        // Deals with profit data first, then by profit desc, then by newest
+        if (pa && !pb) return -1;
+        if (!pa && pb) return 1;
+        if (pa && pb) return pb.profit - pa.profit;
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+      break;
+    }
+    case 'profit-low':
+      deals.sort((a, b) => {
+        const ap = a.buyPrice || 99999, bp = b.buyPrice || 99999;
+        if (ap !== bp) return ap - bp;
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+      break;
+    case 'roi': {
+      deals.sort((a, b) => {
+        const pa = getDealProfit(a), pb = getDealProfit(b);
+        if (pa && !pb) return -1;
+        if (!pa && pb) return 1;
+        if (pa && pb) return pb.roi - pa.roi;
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+      break;
+    }
+  }
+  return deals;
+}
+
+function renderDeals() {
+  const grid = document.getElementById('deals-grid');
+  const label = document.getElementById('deals-count-label');
+  if (!grid) return;
+
+  const deals = filterAndSortDeals();
+  if (label) label.textContent = `${deals.length} deal${deals.length !== 1 ? 's' : ''} found`;
+
+  if (!deals.length) {
+    grid.innerHTML = `<div class="deals-empty" style="grid-column:1/-1">
+      <div class="deals-empty-icon">💰</div>
+      <div class="deals-empty-title">${_dealsState.deals.length ? 'No deals match filter' : 'No deals yet'}</div>
+      <div class="deals-empty-sub">${_dealsState.deals.length ? 'Try changing the filter or search' : 'Start monitoring channels to see deals appear here.<br>Alerts are automatically analyzed for profit potential.'}</div>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = deals.map((deal, i) => {
+    const profit = getDealProfit(deal);
+    const profitClass = profit ? (profit.profit >= 0 ? 'profitable' : 'unprofitable') : 'unknown-profit';
+
+    // Time badge
+    let timeStr = '';
+    let timeClass = '';
+    try {
+      const dt = new Date(deal.timestamp);
+      const mins = (Date.now() - dt.getTime()) / 60000;
+      timeStr = formatTimeAgo(dt);
+      timeClass = mins < 30 ? 'recent' : '';
+    } catch(_) {}
+
+    // Image
+    const imgHtml = deal.img
+      ? `<img class="deal-img" src="${escHtml(deal.img)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=deal-no-img>📦</div>'">`
+      : '<div class="deal-no-img">📦</div>';
+
+    // Retailer ribbon
+    const ribbon = `<div class="deal-retailer-ribbon ${deal.retailer.cls}">${deal.retailer.icon} ${deal.retailer.name}</div>`;
+
+    // Prices
+    const buyPriceHtml = deal.buyPrice
+      ? `<div class="deal-price-col"><span class="deal-price-label">Buy</span><span class="deal-buy-price">$${deal.buyPrice.toFixed(2)}</span></div>`
+      : '<div class="deal-price-col"><span class="deal-price-label">Buy</span><span class="deal-buy-price" style="color:var(--muted)">N/A</span></div>';
+
+    let ebayHtml = '';
+    if (deal.ebayData && deal.ebayData.count > 0) {
+      let fetchedAgo = '';
+      if (deal.ebayData.fetched_at) {
+        try {
+          const fa = new Date(deal.ebayData.fetched_at);
+          const minsAgo = Math.round((Date.now() - fa.getTime()) / 60000);
+          fetchedAgo = minsAgo < 1 ? 'just now' : minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo/60)}h ago`;
+        } catch(_){}
+      }
+      ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay Median <span style="color:var(--muted);font-size:9px">${fetchedAgo ? '· '+fetchedAgo : ''}</span></span><span class="deal-ebay-price">$${deal.ebayData.median.toFixed(2)}</span><span style="color:var(--muted);font-size:9px">${deal.ebayData.count} sold · avg $${deal.ebayData.avg.toFixed(2)}</span></div>`;
+    } else if (deal.ebayData && deal.ebayData.count === 0) {
+      const manualUrl = deal.ebayData.manual_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(deal.title.substring(0,100))}&LH_Complete=1&LH_Sold=1&_sop=12`;
+      const note = deal.ebayData.blocked ? 'eBay blocked — check manually' : (deal.ebayData.note || 'No sold data found');
+      ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay</span><a href="${escHtml(manualUrl)}" target="_blank" rel="noopener" class="deal-ebay-price loading" style="color:var(--yellow);text-decoration:underline;cursor:pointer;font-size:10px">${escHtml(note)}</a></div>`;
+    }
+
+    // Profit row
+    let profitHtml = '';
+    if (profit) {
+      const sign = profit.profit >= 0 ? '+' : '';
+      const cls = profit.profit >= 0 ? 'positive' : 'negative';
+      const barW = Math.min(Math.abs(profit.roi), 200) / 2;
+      profitHtml = `<div class="deal-profit-row">
+        <span class="deal-profit-amount ${cls}">${sign}$${profit.profit.toFixed(2)}</span>
+        <span class="deal-roi ${cls}">${sign}${profit.roi}% ROI</span>
+        <div class="deal-profit-bar"><div class="deal-profit-fill ${cls}" style="width:${barW}%"></div></div>
+      </div>`;
+    }
+
+    // Search query for eBay/Amazon
+    const sq = encodeURIComponent(deal.title.substring(0, 100));
+
+    // ── Product IDs for deal card ──
+    const dealPids = extractProductIds(deal.content || '', deal.links || []);
+    if (deal.sku) {
+      if (/^B0[A-Z0-9]{8}$/.test(deal.sku) && !dealPids.asins.includes(deal.sku)) dealPids.asins.push(deal.sku);
+      else if (/^\d{7,12}$/.test(deal.sku)) { dealPids.skus = dealPids.skus || []; if (!dealPids.skus.includes(deal.sku)) dealPids.skus.push(deal.sku); }
+    }
+    const dealPidsHtml = renderProductIdsHtml(dealPids, deal.key);
+
+    // Lookup button — only shown when no eBay data yet, separate from link buttons
+    const lookupBtn = (!deal.ebayData)
+      ? `<button type="button" class="deal-lookup-btn" data-deal-key="${escHtml(deal.key)}">📊 Check eBay Price</button>`
+      : '';
+
+    return `<div class="deal-card ${profitClass}" data-deal-idx="${i}">
+      <div class="deal-img-wrap">
+        ${imgHtml}
+        ${ribbon}
+        ${timeStr ? `<div class="deal-time-badge ${timeClass}">${timeStr}</div>` : ''}
+      </div>
+      <div class="deal-body">
+        <div class="deal-title" title="${escHtml(deal.title)}">${escHtml(deal.title)}</div>
+        <div class="deal-source">
+          <span class="deal-source-channel">#${escHtml(deal.channel)}</span>
+          <span>${escHtml(deal.server)}</span>
+          ${deal.alertCount > 1 ? `<span>×${deal.alertCount}</span>` : ''}
+        </div>
+        <div class="deal-prices">${buyPriceHtml}${ebayHtml}</div>
+        ${profitHtml}
+        ${dealPidsHtml ? `<div class="deal-product-ids">${dealPidsHtml}</div>` : ''}
+        ${lookupBtn}
+        <div class="deal-actions">
+          <a class="deal-action-btn" href="https://www.ebay.com/sch/i.html?_nkw=${sq}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener">🔍 eBay Sold</a>
+          <a class="deal-action-btn" href="https://www.amazon.com/s?k=${sq}" target="_blank" rel="noopener">🅰 Amazon</a>
+          <a class="deal-action-btn" href="https://keepa.com/#!search/1-${sq}" target="_blank" rel="noopener">📊 Keepa</a>
+          ${deal.jumpUrl ? `<a class="deal-action-btn" href="${escHtml(deal.jumpUrl)}" target="_blank" rel="noopener">↗ Discord</a>` : ''}
+          ${deal.atcUrl ? `<a class="deal-action-btn" href="${escHtml(deal.atcUrl)}" target="_blank" rel="noopener" style="background:rgba(59,165,92,.12);border-color:rgba(59,165,92,.35);color:var(--green)">🛒 Buy</a>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchToDealsView() {
+  _dealsState.activeView = 'deals';
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('deals-container').classList.add('active');
+  loadDeals();
+}
+
+function switchToLogsView() {
+  _dealsState.activeView = 'logs';
+  document.getElementById('main').style.display = '';
+  document.getElementById('deals-container').classList.remove('active');
+}
+
+// ── Polling ────────────────────────────────────────────────────────────────
+function startPolling() {
+  setInterval(pollOnce, 800);
+}
+
+// ── Save full config ───────────────────────────────────────────────────────
+async function saveConfig() {
+  const token = document.getElementById('cfg-token').value.trim();
+  const userId = document.getElementById('cfg-user-id').value.trim();
+  const cooldown = parseInt(document.getElementById('cfg-cooldown').value) || 30;
+  const ntfyServer = document.getElementById('cfg-ntfy-server').value.trim();
+  const ntfyTopic = document.getElementById('ctrl-ntfy-topic').value.trim();
+  const discordDm = document.getElementById('toggle-dm').checked;
+  const ntfyEnabled = document.getElementById('toggle-ntfy').checked;
+
+  const payload = {
+    token,
+    user_id: userId,
+    cooldown,
+    ntfy_server: ntfyServer,
+    ntfy_topic: ntfyTopic,
+    discord_dm: discordDm,
+    ntfy_enabled: ntfyEnabled,
+    keywords: S.keywords,
+    channels: S.channels,
+    keyword_priorities: S.keywordPriorities,
+    keyword_groups: S.keywordGroups,
+    webhooks: S.webhooks,
+  };
+
+  const res = await api.post('/api/config', payload);
+  if (res.ok) {
+    toast('Settings saved ✓', 'success');
+  } else {
+    toast('Save failed: ' + (res.error || 'Unknown error'), 'error');
+  }
+}
+
+// ── Event listeners ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadAll();
+  startPolling();
+  initKeyboardShortcuts();
+  requestNotifPermission();
+
+  // Mobile menu toggle
+  document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('mobile-open');
+  });
+
+  // Close mobile sidebar when clicking main area
+  document.getElementById('main')?.addEventListener('click', () => {
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
+  });
+
+  // Sound toggle
+  const btnSound = document.getElementById('btn-sound');
+  btnSound.addEventListener('click', () => {
+    S.soundEnabled = !S.soundEnabled;
+    btnSound.classList.toggle('toggle-off', !S.soundEnabled);
+    btnSound.classList.toggle('toggle-active', S.soundEnabled);
+    toast(S.soundEnabled ? 'Sound alerts on' : 'Sound alerts off', 'info', 1500);
+    if (S.soundEnabled) playAlertSound('medium'); // preview
+  });
+
+  // Desktop notifications toggle
+  const btnNotifs = document.getElementById('btn-notifs');
+  btnNotifs.addEventListener('click', async () => {
+    if (!S.notifsEnabled) {
+      // Re-requesting
+      if (Notification.permission !== 'granted') await Notification.requestPermission();
+    }
+    S.notifsEnabled = !S.notifsEnabled;
+    btnNotifs.classList.toggle('toggle-off', !S.notifsEnabled);
+    btnNotifs.classList.toggle('toggle-active', S.notifsEnabled);
+    toast(S.notifsEnabled ? 'Desktop notifications on' : 'Desktop notifications off', 'info', 1500);
+  });
+
+  // Keyboard shortcut hint — show as tooltip on refresh button instead of taking toolbar space
+  const refreshBtn = document.getElementById('btn-refresh-now');
+  if (refreshBtn) refreshBtn.title = 'Refresh feed  ·  Shortcuts: A=ATC  D=Discord  Esc=clear';
+
+  // Tab navigation — single consolidated handler for all tab switches
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+
+      const t = tab.dataset.tab;
+      // Stats tab — fetch fresh data
+      if (t === 'stats') setTimeout(() => { fetchStats(); fetchHistory(); renderFlipLog(); }, 100);
+      // Deals tab — switch main view
+      if (t === 'deals') switchToDealsView();
+      else if (_dealsState.activeView === 'deals') switchToLogsView();
+      // Sync tab — load status + devices
+      if (t === 'sync') { loadSyncStatus(); loadSyncDevices(); }
+      // Close mobile menu
+      document.getElementById('sidebar')?.classList.remove('mobile-open');
+    });
+  });
+
+  // Filter tabs
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      S.filter = tab.dataset.filter;
+      rebuildLogs();
+    });
+  });
+
+  // Log search
+  let searchTimeout;
+  document.getElementById('log-search').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      S.searchQuery = e.target.value.trim();
+      rebuildLogs();
+    }, 200);
+  });
+
+  document.getElementById('btn-refresh-now').addEventListener('click', async () => {
+    S.lastTopId = 0; // force rebuild on next poll
+    await pollOnce();
+    toast('Feed refreshed', 'info', 1200);
+  });
+
+  // Start / Stop
+  document.getElementById('btn-start').addEventListener('click', async () => {
+    await saveConfig();
+    const res = await api.post('/api/start', { manual: true });
+    if (res.ok) {
+      S.manualStarted = true;
+      updateStatus(true);
+      // Start ticking immediately; status poll will resync to server start_time.
+      S.startTime = Date.now();
+      startUptimeTicker();
+      toast('Monitor started', 'success');
+    } else {
+      toast(res.error || 'Start failed', 'error');
+    }
+  });
+
+  document.getElementById('btn-stop').addEventListener('click', async () => {
+    const res = await api.post('/api/stop', {});
+    if (res.ok) {
+      S.manualStarted = false;
+      updateStatus(false);
+      toast('Monitor stopped', 'info');
+    } else {
+      toast(res.error || 'Stop failed', 'error');
+    }
+  });
+
+  // Save config
+  document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+
+  // Ntfy topic sync (ctrl tab → also updates config)
+  document.getElementById('ctrl-ntfy-topic').addEventListener('change', () => {
+    S.config.ntfy_topic = document.getElementById('ctrl-ntfy-topic').value;
+  });
+
+  // Test Ntfy
+  document.getElementById('btn-test-ntfy').addEventListener('click', async () => {
+    const topic = document.getElementById('ctrl-ntfy-topic').value.trim();
+    if (!topic) { toast('Enter a Ntfy topic first', 'error'); return; }
+    const server = document.getElementById('cfg-ntfy-server').value.trim() || 'https://ntfy.sh';
+    const res = await api.post('/api/test_ntfy', { topic, server });
+    if (res.ok) toast('Test notification sent! Check your phone.', 'success');
+    else toast(res.error || 'Test failed', 'error');
+  });
+
+  // Clear logs
+  document.getElementById('btn-clear-logs').addEventListener('click', async () => {
+    await api.post('/api/logs/clear', {});
+    S.logs = [];
+    S.lastTopId = 0;
+    S.alertCount = 0;
+    rebuildLogs();
+    updateAlertCount(0);
+    toast('Logs cleared', 'info');
+  });
+
+  // Click anywhere on an alert card to jump quickly.
+  document.getElementById('log-container').addEventListener('click', async (e) => {
+    // Copy title button
+    const copyBtn = e.target.closest('.btn-copy-title');
+    if (copyBtn) {
+      e.stopPropagation();
+      const text = copyBtn.getAttribute('data-copy-text');
+      if (text) {
+        navigator.clipboard.writeText(text).then(() => {
+          copyBtn.classList.add('copied');
+          copyBtn.textContent = '✓ Copied!';
+          setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.innerHTML = '📋 Copy'; }, 1500);
+        }).catch(() => toast('Copy failed', 'error'));
+      }
+      return;
+    }
+
+    // Product ID chip — copy to clipboard
+    const pidChip = e.target.closest('.pid-chip');
+    if (pidChip) {
+      e.stopPropagation();
+      const text = pidChip.getAttribute('data-copy');
+      if (text) {
+        navigator.clipboard.writeText(text).then(() => {
+          pidChip.classList.add('copied');
+          const origHTML = pidChip.innerHTML;
+          pidChip.innerHTML = '✓ Copied!';
+          toast(`Copied: ${text}`, 'success', 1500);
+          setTimeout(() => { pidChip.classList.remove('copied'); pidChip.innerHTML = origHTML; }, 1200);
+        }).catch(() => toast('Copy failed', 'error'));
+      }
+      return;
+    }
+
+    // Resolve redirect URLs button
+    const resolveBtn = e.target.closest('.pid-resolve-btn');
+    if (resolveBtn) {
+      e.stopPropagation();
+      resolveBtn.disabled = true;
+      resolveBtn.textContent = '⏳ Resolving...';
+      try {
+        const urls = JSON.parse(resolveBtn.dataset.urls || '[]');
+        await resolveProductUrls(urls);
+        // Re-render to show resolved IDs
+        rebuildLogs();
+        toast('Links resolved! Product IDs updated.', 'success', 2000);
+      } catch(err) {
+        toast('Resolve failed: ' + err, 'error');
+        resolveBtn.disabled = false;
+        resolveBtn.textContent = '🔗 Retry';
+      }
+      return;
+    }
+
+    const card = e.target.closest('.alert-card.clickable');
+    if (!card) return;
+    // Let any real <a> link handle its own navigation without double-opening
+    if (e.target.closest('a')) return;
+    const url = card.getAttribute('data-jump-url');
+    if (url) window.open(url, '_blank');
+  });
+
+  // ── Live time-ago updater (every 30s) ────────────────────────────────────
+  setInterval(() => {
+    document.querySelectorAll('.ac-time-ago[data-ts]').forEach(el => {
+      try {
+        const dt = new Date(el.dataset.ts);
+        if (isNaN(dt)) return;
+        const mins = (Date.now() - dt.getTime()) / 60000;
+        el.textContent = `(${formatTimeAgo(dt)})`;
+        el.classList.toggle('recent', mins < 2);
+        el.classList.toggle('stale', mins > 30);
+      } catch(_) {}
+    });
+  }, 30000);
+
+  // Right-click on ASIN chip opens Amazon product page
+  document.addEventListener('contextmenu', (e) => {
+    const pidChip = e.target.closest('.pid-chip.asin');
+    if (pidChip) {
+      e.preventDefault();
+      const asin = pidChip.getAttribute('data-copy');
+      if (asin) window.open(`https://www.amazon.com/dp/${asin}`, '_blank');
+    }
+  });
+
+  // Token show/hide
+  const tokenInput = document.getElementById('cfg-token');
+  const tokenBtn = document.getElementById('token-show-btn');
+  tokenBtn.addEventListener('click', () => {
+    const isHidden = tokenInput.type === 'password';
+    tokenInput.type = isHidden ? 'text' : 'password';
+    tokenBtn.textContent = isHidden ? 'hide' : 'show';
+  });
+
+  // Add channel
+  document.getElementById('btn-add-channel').addEventListener('click', () => {
+    const idVal = document.getElementById('new-channel-id').value.trim();
+    const nameVal = document.getElementById('new-channel-name').value.trim();
+    if (!idVal || !/^\d+$/.test(idVal)) {
+      toast('Enter a valid numeric Channel ID', 'error');
+      return;
+    }
+    if (S.channels.find(c => c.id === idVal)) {
+      toast('Channel already added', 'error');
+      return;
+    }
+    S.channels.push({ 
+      id: idVal, 
+      name: nameVal || idVal,
+      mode: 'keywords'  // Default to keyword mode
+    });
+    document.getElementById('new-channel-id').value = '';
+    document.getElementById('new-channel-name').value = '';
+    renderChannels();
+  });
+
+  // Enter key for channel
+  document.getElementById('new-channel-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-add-channel').click();
+  });
+
+  // Remove channel
+  document.getElementById('channel-list').addEventListener('click', e => {
+    // Mode toggle
+    const modeBadge = e.target.closest('.mode-badge');
+    if (modeBadge) {
+      const idx = parseInt(modeBadge.dataset.idx);
+      const ch = S.channels[idx];
+      ch.mode = ch.mode === 'all' ? 'keywords' : 'all';
+      renderChannels();
+      return;
+    }
+
+    // Remove channel
+    const btn = e.target.closest('.channel-remove');
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.idx);
+    S.channels.splice(idx, 1);
+    renderChannels();
+  });
+
+  // Keyword add with priority (see below for enhanced version)
+
+  // Keyword group assignment dropdown
+  document.getElementById('keyword-list').addEventListener('change', e => {
+    const select = e.target.closest('.tag-group-select');
+    if (!select) return;
+    const kw = select.dataset.kw;
+    const newGroup = select.value;
+    // Remove from all groups first
+    for (const [gName, grp] of Object.entries(S.keywordGroups)) {
+      grp.keywords = (grp.keywords || []).filter(k => k.toLowerCase() !== kw.toLowerCase());
+    }
+    // Add to new group if selected
+    if (newGroup && S.keywordGroups[newGroup]) {
+      S.keywordGroups[newGroup].keywords.push(kw);
+    }
+    renderKeywords();
+    renderKeywordGroups();
+    scheduleAutoSave();
+    toast(newGroup ? `"${kw}" → ${newGroup}` : `"${kw}" unassigned`, 'info', 1500);
+  });
+
+  // Remove keyword
+  document.getElementById('keyword-list').addEventListener('click', e => {
+    // Priority cycling
+    const priBtn = e.target.closest('.tag-priority');
+    if (priBtn) {
+      const idx = parseInt(priBtn.dataset.idx);
+      const kw = S.keywords[idx];
+      const cur = S.keywordPriorities[kw] || 'medium';
+      const next = cur === 'medium' ? 'high' : cur === 'high' ? 'low' : 'medium';
+      if (next === 'medium') delete S.keywordPriorities[kw];
+      else S.keywordPriorities[kw] = next;
+      renderKeywords();
+      scheduleAutoSave();
+      return;
+    }
+    const btn = e.target.closest('.tag-remove');
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.idx);
+    const removed = S.keywords[idx];
+    S.keywords.splice(idx, 1);
+    delete S.keywordPriorities[removed];
+    renderKeywords();
+    scheduleAutoSave();
+  });
+
+  // ── Volume slider ──────────────────────────────────────────────────────────
+  const volSlider = document.getElementById('volume-slider');
+  const volValue = document.getElementById('volume-value');
+  if (volSlider) {
+    volSlider.addEventListener('input', () => {
+      const pct = parseInt(volSlider.value);
+      S.alertVolume = (pct / 100) * 0.4; // max 0.4 volume
+      if (volValue) volValue.textContent = pct + '%';
+      localStorage.setItem('dm_volume', String(S.alertVolume));
+    });
+    // Init display
+    const initPct = Math.round((S.alertVolume / 0.4) * 100);
+    volSlider.value = initPct;
+    if (volValue) volValue.textContent = initPct + '%';
+  }
+
+  // ── Sound presets ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.sound-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.alertSoundPreset = btn.dataset.sound;
+      localStorage.setItem('dm_sound_preset', S.alertSoundPreset);
+      document.querySelectorAll('.sound-preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+      playAlertSound('medium'); // preview
+    });
+  });
+
+  // ── Keyword group management ───────────────────────────────────────────────
+  document.getElementById('btn-add-group')?.addEventListener('click', () => {
+    const nameInput = document.getElementById('new-group-name');
+    const colorInput = document.getElementById('new-group-color');
+    const name = (nameInput.value || '').trim();
+    if (!name) { toast('Enter a group name', 'error'); return; }
+    if (S.keywordGroups[name]) { toast('Group already exists', 'error'); return; }
+    S.keywordGroups[name] = { color: colorInput.value || '#5865f2', keywords: [] };
+    nameInput.value = '';
+    renderKeywordGroups();
+    scheduleAutoSave();
+  });
+
+  document.getElementById('keyword-groups-container')?.addEventListener('click', e => {
+    // Delete group
+    const removeGroup = e.target.closest('.channel-remove[data-group]');
+    if (removeGroup && !removeGroup.dataset.kw) {
+      const gName = removeGroup.dataset.group;
+      delete S.keywordGroups[gName];
+      renderKeywordGroups();
+      renderKeywords();
+      scheduleAutoSave();
+      return;
+    }
+    // Remove keyword from group
+    const removeKw = e.target.closest('.tag-remove[data-group]');
+    if (removeKw) {
+      const gName = removeKw.dataset.group;
+      const kw = removeKw.dataset.kw;
+      const grp = S.keywordGroups[gName];
+      if (grp) {
+        grp.keywords = (grp.keywords || []).filter(k => k !== kw);
+        renderKeywordGroups();
+        renderKeywords();
+        scheduleAutoSave();
+      }
+      return;
+    }
+  });
+
+  // ── Webhook management ─────────────────────────────────────────────────────
+  document.getElementById('btn-add-webhook')?.addEventListener('click', () => {
+    const nameInput = document.getElementById('new-webhook-name');
+    const urlInput = document.getElementById('new-webhook-url');
+    const url = (urlInput.value || '').trim();
+    const name = (nameInput.value || '').trim() || 'Webhook';
+    if (!url || !url.startsWith('http')) { toast('Enter a valid webhook URL', 'error'); return; }
+    S.webhooks.push({ url, name, enabled: true });
+    nameInput.value = '';
+    urlInput.value = '';
+    renderWebhooks();
+    scheduleAutoSave();
+  });
+
+  document.getElementById('webhook-list')?.addEventListener('click', e => {
+    const removeBtn = e.target.closest('.channel-remove[data-wh-idx]');
+    if (removeBtn) {
+      const idx = parseInt(removeBtn.dataset.whIdx);
+      S.webhooks.splice(idx, 1);
+      renderWebhooks();
+      scheduleAutoSave();
+    }
+  });
+
+  // Webhook enable/disable toggle
+  document.getElementById('webhook-list')?.addEventListener('change', e => {
+    const toggle = e.target.closest('[data-wh-toggle]');
+    if (toggle) {
+      const idx = parseInt(toggle.dataset.whToggle);
+      if (S.webhooks[idx]) {
+        S.webhooks[idx].enabled = toggle.checked;
+        renderWebhooks();
+        scheduleAutoSave();
+        toast(toggle.checked ? 'Webhook enabled' : 'Webhook disabled', 'info', 1500);
+      }
+    }
+  });
+
+  // ── Profit calculator ──────────────────────────────────────────────────────
+  document.getElementById('calc-buy')?.addEventListener('input', updateCalcResult);
+  document.getElementById('calc-sell')?.addEventListener('input', updateCalcResult);
+
+  document.getElementById('btn-add-flip')?.addEventListener('click', () => {
+    const buy = parseFloat(document.getElementById('calc-buy')?.value) || 0;
+    const sell = parseFloat(document.getElementById('calc-sell')?.value) || 0;
+    if (buy <= 0 || sell <= 0) { toast('Enter both buy and sell prices', 'error'); return; }
+    S.flipLog.push({ buy, sell, profit: sell - buy, time: new Date().toISOString() });
+    localStorage.setItem('dm_flip_log', JSON.stringify(S.flipLog));
+    document.getElementById('calc-buy').value = '';
+    document.getElementById('calc-sell').value = '';
+    updateCalcResult();
+    updateFlipTotals();
+    renderFlipLog();
+    toast(`Logged flip: +$${(sell - buy).toFixed(2)}`, 'success', 2000);
+  });
+
+  document.getElementById('btn-clear-flips')?.addEventListener('click', () => {
+    S.flipLog = [];
+    localStorage.setItem('dm_flip_log', '[]');
+    updateFlipTotals();
+    renderFlipLog();
+    toast('Flip log cleared', 'info');
+  });
+
+  // ── Alert history browser ──────────────────────────────────────────────────
+  document.getElementById('btn-history-prev')?.addEventListener('click', () => {
+    if (_historyPage > 0) { _historyPage--; fetchHistory(); }
+  });
+  document.getElementById('btn-history-next')?.addEventListener('click', () => {
+    _historyPage++;
+    fetchHistory();
+  });
+  document.getElementById('history-list')?.addEventListener('click', e => {
+    const item = e.target.closest('.history-item');
+    if (item && item.dataset.jump) {
+      window.open(item.dataset.jump, '_blank');
+    }
+  });
+
+  // ── Auto-save on toggle changes ────────────────────────────────────────────
+  ['toggle-dm', 'toggle-ntfy'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', scheduleAutoSave);
+  });
+  document.getElementById('cfg-cooldown')?.addEventListener('change', scheduleAutoSave);
+  document.getElementById('ctrl-ntfy-topic')?.addEventListener('change', scheduleAutoSave);
+
+  // ── Stats polling ──────────────────────────────────────────────────────────
+  S.statsInterval = setInterval(() => {
+    // Only fetch stats when stats tab is active
+    const statsTab = document.getElementById('tab-stats');
+    if (statsTab && statsTab.classList.contains('active')) fetchStats();
+  }, 10000);
+
+  // (stats + mobile-menu tab logic consolidated into main tab handler above)
+
+  // ── Add keyword with priority ──────────────────────────────────────────────
+  // Override the addKeyword function to include priority
+  function addKeywordWithPriority() {
+    const input = document.getElementById('new-keyword');
+    const priSelect = document.getElementById('keyword-priority-select');
+    const val = input.value.trim().toLowerCase();
+    if (!val) return;
+    if (S.keywords.includes(val)) { toast('Keyword already exists', 'error'); return; }
+    S.keywords.push(val);
+    const pri = priSelect ? priSelect.value : 'medium';
+    if (pri !== 'medium') S.keywordPriorities[val] = pri;
+    input.value = '';
+    renderKeywords();
+    scheduleAutoSave();
+  }
+
+  // Bind the add keyword button
+  document.getElementById('btn-add-keyword').addEventListener('click', addKeywordWithPriority);
+  document.getElementById('new-keyword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addKeywordWithPriority();
+  });
+
+  // ── DEALS TAB ───────────────────────────────────────────────────────────────
+  // (deals tab switch logic consolidated into main tab handler above)
+
+  // Retailer filters
+  document.getElementById('deals-retailer-filters')?.addEventListener('click', e => {
+    const btn = e.target.closest('.deals-filter-btn');
+    if (!btn) return;
+    document.querySelectorAll('#deals-retailer-filters .deals-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _dealsState.filter = btn.dataset.retailer;
+    renderDeals();
+  });
+
+  // Sort — update state + re-render + feedback
+  const dealsSortEl = document.getElementById('deals-sort');
+  if (dealsSortEl) {
+    dealsSortEl.addEventListener('change', e => {
+      _dealsState.sort = e.target.value;
+      renderDeals();
+      // Scroll deals area back to top so user sees the reorder
+      const scrollArea = document.querySelector('.deals-scroll');
+      if (scrollArea) scrollArea.scrollTop = 0;
+      const sortLabels = { newest:'Newest First', 'profit-high':'Highest Profit', 'profit-low':'Lowest Price', roi:'Best ROI %' };
+      toast(`Sorted: ${sortLabels[e.target.value] || e.target.value}`, 'info', 1500);
+    });
+    // Also respond to clicks (re-apply same sort to give feedback even if value unchanged)
+    dealsSortEl.addEventListener('click', () => {
+      _dealsState.sort = dealsSortEl.value;
+      renderDeals();
+    });
+  }
+
+  // Search
+  let _dealsSearchTimer;
+  document.getElementById('deals-search')?.addEventListener('input', e => {
+    clearTimeout(_dealsSearchTimer);
+    _dealsSearchTimer = setTimeout(() => {
+      _dealsState.search = e.target.value.trim();
+      renderDeals();
+    }, 200);
+  });
+
+  // Refresh deals
+  document.getElementById('btn-deals-refresh')?.addEventListener('click', () => {
+    loadDeals();
+    toast('Deals refreshed', 'info', 1500);
+  });
+
+  // eBay lookup click on individual card — use capture phase to intercept before <a> links
+  document.getElementById('deals-grid')?.addEventListener('click', async e => {
+    // Product ID chip — copy to clipboard (deals grid)
+    const pidChip = e.target.closest('.pid-chip');
+    if (pidChip) {
+      e.preventDefault();
+      e.stopPropagation();
+      const text = pidChip.getAttribute('data-copy');
+      if (text) {
+        navigator.clipboard.writeText(text).then(() => {
+          pidChip.classList.add('copied');
+          const origHTML = pidChip.innerHTML;
+          pidChip.innerHTML = '✓ Copied!';
+          toast(`Copied: ${text}`, 'success', 1500);
+          setTimeout(() => { pidChip.classList.remove('copied'); pidChip.innerHTML = origHTML; }, 1200);
+        }).catch(() => toast('Copy failed', 'error'));
+      }
+      return;
+    }
+
+    // Resolve redirect URLs button (deals grid)
+    const resolveBtn = e.target.closest('.pid-resolve-btn');
+    if (resolveBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      resolveBtn.disabled = true;
+      resolveBtn.textContent = '⏳ Resolving...';
+      try {
+        const urls = JSON.parse(resolveBtn.dataset.urls || '[]');
+        await resolveProductUrls(urls);
+        renderDeals();
+        toast('Links resolved! Product IDs updated.', 'success', 2000);
+      } catch(err) {
+        toast('Resolve failed: ' + err, 'error');
+        resolveBtn.disabled = false;
+        resolveBtn.textContent = '🔗 Retry';
+      }
+      return;
+    }
+
+    const btn = e.target.closest('button.deal-lookup-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const key = btn.dataset.dealKey;
+    const deal = _dealsState.deals.find(d => d.key === key);
+    if (!deal) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ Looking up...';
+    await ebayLookup(deal);
+    renderDeals();
+  }, true);
+
+  // Lookup all eBay prices
+  document.getElementById('btn-deals-lookup-all')?.addEventListener('click', async () => {
+    const toCheck = _dealsState.deals.filter(d => !d.ebayData);
+    if (!toCheck.length) { toast('All deals already checked', 'info'); return; }
+    toast(`Looking up ${toCheck.length} items on eBay...`, 'info', 3000);
+    let done = 0;
+    for (const deal of toCheck) {
+      await ebayLookup(deal);
+      done++;
+      if (done % 3 === 0) renderDeals(); // update UI every 3 lookups
+    }
+    renderDeals();
+    toast(`eBay lookup complete: ${done} items checked`, 'success', 3000);
+  });
+
+  // Auto-refresh stale eBay data every 5 minutes when deals tab is active
+  setInterval(async () => {
+    if (_dealsState.activeView !== 'deals') return;
+    const stale = _dealsState.deals.filter(d => {
+      if (!d.ebayData || !d.ebayData.fetched_at) return false;
+      return Date.now() - new Date(d.ebayData.fetched_at).getTime() > EBAY_CACHE_TTL;
+    });
+    if (!stale.length) return;
+    for (const deal of stale.slice(0, 5)) { // refresh up to 5 at a time
+      await ebayLookup(deal, true);
+    }
+    renderDeals();
+  }, 5 * 60 * 1000);
+
+  // ── Channel changes trigger auto-save ──────────────────────────────────────
+  const channelList = document.getElementById('channel-list');
+  if (channelList) {
+    new MutationObserver(() => scheduleAutoSave()).observe(channelList, { childList: true, subtree: true });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  CLOUD SYNC
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Load sync settings when Sync tab is opened ──
+  async function loadSyncStatus() {
+    try {
+      const data = await api.get('/api/sync/status');
+      document.getElementById('sync-firebase-url').value = data.firebase_url || '';
+      document.getElementById('sync-device-name').value = data.device_name || '';
+      document.getElementById('toggle-auto-sync').checked = data.auto_sync !== false;
+      document.getElementById('sync-interval').value = Math.round((data.sync_interval || 300) / 60);
+      document.getElementById('sync-local-count').textContent = data.local_alerts || 0;
+      document.getElementById('sync-last-push').textContent = data.last_push ? formatTimeAgo(new Date(data.last_push)) : 'Never';
+      document.getElementById('sync-last-pull').textContent = data.last_pull ? formatTimeAgo(new Date(data.last_pull)) : 'Never';
+
+      const indicator = document.getElementById('sync-status-indicator');
+      const headerChip = document.getElementById('h-sync-chip');
+      const headerStatus = document.getElementById('h-sync-status');
+      if (data.enabled && data.firebase_url) {
+        indicator.textContent = '🟢 Connected';
+        indicator.style.color = 'var(--green)';
+        if (headerChip) { headerChip.style.display = ''; headerStatus.textContent = 'On'; }
+      } else {
+        indicator.textContent = data.firebase_url ? '⏸ Disabled' : '⚪ Not configured';
+        indicator.style.color = 'var(--muted)';
+        if (headerChip) { headerChip.style.display = 'none'; }
+      }
+    } catch(_) {}
+  }
+
+  async function loadSyncDevices() {
+    try {
+      const data = await api.get('/api/sync/devices');
+      const el = document.getElementById('sync-device-list');
+      if (!el) return;
+      const devices = data.devices || [];
+      if (!devices.length) {
+        el.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:8px 0">No devices synced yet</div>';
+        return;
+      }
+      el.innerHTML = devices.map(d => {
+        const lastSeen = d.last_push ? formatTimeAgo(new Date(d.last_push)) : 'never';
+        const isRunning = d.running ? '🟢' : '⚪';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:4px">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--text)">${isRunning} ${escHtml(d.name || d.id)}</div>
+            <div style="font-size:9px;color:var(--muted)">${d.alert_count || 0} alerts · ${lastSeen}</div>
+          </div>
+          <div style="font-size:9px;color:var(--muted)">${escHtml(d.id || '')}</div>
+        </div>`;
+      }).join('');
+
+      // Update cloud alert count
+      const cloudCount = document.getElementById('sync-cloud-count');
+      if (cloudCount) {
+        const total = devices.reduce((sum, d) => Math.max(sum, d.alert_count || 0), 0);
+        cloudCount.textContent = total > 0 ? total : '—';
+      }
+    } catch(_) {}
+  }
+
+  // (sync tab switch logic consolidated into main tab handler above)
+
+  // ── Test connection button ──
+  document.getElementById('btn-sync-test')?.addEventListener('click', async () => {
+    const fbUrl = document.getElementById('sync-firebase-url').value.trim();
+    const resultEl = document.getElementById('sync-test-result');
+    if (!fbUrl) { toast('Enter a Firebase URL first', 'error'); return; }
+    resultEl.style.display = 'block';
+    resultEl.textContent = '⏳ Testing...';
+    resultEl.style.background = 'rgba(88,101,242,.1)';
+    resultEl.style.color = 'var(--accent2)';
+    try {
+      const data = await api.post('/api/sync/test', { firebase_url: fbUrl });
+      if (data.ok) {
+        resultEl.textContent = '✅ Connected! Firebase is working.';
+        resultEl.style.background = 'rgba(59,165,92,.1)';
+        resultEl.style.color = 'var(--green)';
+      } else {
+        resultEl.textContent = '❌ ' + (data.error || 'Connection failed');
+        resultEl.style.background = 'rgba(237,66,69,.1)';
+        resultEl.style.color = 'var(--red)';
+      }
+    } catch(e) {
+      resultEl.textContent = '❌ Request failed: ' + e;
+      resultEl.style.background = 'rgba(237,66,69,.1)';
+      resultEl.style.color = 'var(--red)';
+    }
+  });
+
+  // ── Save sync settings ──
+  document.getElementById('btn-sync-save')?.addEventListener('click', async () => {
+    const fbUrl = document.getElementById('sync-firebase-url').value.trim();
+    const deviceName = document.getElementById('sync-device-name').value.trim();
+    const autoSync = document.getElementById('toggle-auto-sync').checked;
+    const intervalMin = parseInt(document.getElementById('sync-interval').value) || 5;
+    try {
+      const res = await api.post('/api/sync/configure', {
+        firebase_url: fbUrl,
+        device_name: deviceName || 'My Device',
+        enabled: !!fbUrl,
+        auto_sync: autoSync,
+        sync_interval: intervalMin * 60,
+      });
+      if (res.ok) {
+        toast('Sync settings saved ✓', 'success');
+        loadSyncStatus();
+      } else {
+        toast('Save failed: ' + (res.error || 'Unknown'), 'error');
+      }
+    } catch(e) { toast('Error: ' + e, 'error'); }
+  });
+
+  // ── Push to cloud ──
+  document.getElementById('btn-sync-push')?.addEventListener('click', async () => {
+    toast('⬆ Pushing to cloud...', 'info', 2000);
+    try {
+      // Include eBay cache from frontend
+      const res = await api.post('/api/sync/push', { ebay_cache: _dealsState.ebayCache || {} });
+      if (res.ok) {
+        toast(`☁️ Pushed ${res.pushed_alerts || 0} alerts to cloud`, 'success');
+        loadSyncStatus();
+      } else {
+        toast('Push failed: ' + (res.error || 'Unknown'), 'error');
+      }
+    } catch(e) { toast('Push error: ' + e, 'error'); }
+  });
+
+  // ── Pull from cloud ──
+  document.getElementById('btn-sync-pull')?.addEventListener('click', async () => {
+    toast('⬇ Pulling from cloud...', 'info', 2000);
+    try {
+      const res = await api.post('/api/sync/pull', {});
+      if (res.ok) {
+        toast(`☁️ Pulled ${res.new_alerts || 0} new alerts (${res.total_cloud || 0} in cloud)`, 'success');
+        // Merge eBay cache into frontend
+        if (res.ebay_cache && typeof res.ebay_cache === 'object') {
+          for (const [key, val] of Object.entries(res.ebay_cache)) {
+            if (!_dealsState.ebayCache[key] || (val.fetched_at && (!_dealsState.ebayCache[key].fetched_at ||
+                new Date(val.fetched_at) > new Date(_dealsState.ebayCache[key].fetched_at)))) {
+              _dealsState.ebayCache[key] = val;
+            }
+          }
+        }
+        loadSyncStatus();
+        // Refresh deals if on that view
+        if (_dealsState.activeView === 'deals') loadDeals();
+      } else {
+        toast('Pull failed: ' + (res.error || 'Unknown'), 'error');
+      }
+    } catch(e) { toast('Pull error: ' + e, 'error'); }
+  });
+
+  // ── Export backup ──
+  document.getElementById('btn-sync-backup')?.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = '/api/sync/backup';
+    a.download = 'dropscout_backup.json';
+    a.click();
+    toast('💾 Backup downloading...', 'info');
+  });
+
+  // ── Import backup ──
+  document.getElementById('btn-sync-restore')?.addEventListener('click', () => {
+    document.getElementById('sync-restore-file').click();
+  });
+
+  document.getElementById('sync-restore-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.alert_history && !data.config) {
+        toast('Invalid backup file — missing alert_history or config', 'error');
+        return;
+      }
+      const res = await api.post('/api/sync/restore', data);
+      if (res.ok !== undefined) {
+        toast(`📥 Restored ${res.restored_alerts || 0} alerts`, 'success');
+        loadSyncStatus();
+      } else {
+        toast('Restore failed: ' + (res.error || 'Unknown'), 'error');
+      }
+    } catch(err) {
+      toast('Failed to read backup: ' + err, 'error');
+    }
+    e.target.value = ''; // reset file input
+  });
+
+  // ── Update sync header chip periodically ──
+  setInterval(async () => {
+    try {
+      const data = await api.get('/api/sync/status');
+      const chip = document.getElementById('h-sync-chip');
+      const status = document.getElementById('h-sync-status');
+      if (data.enabled && data.firebase_url) {
+        if (chip) chip.style.display = '';
+        if (status) status.textContent = data.last_push ? formatTimeAgo(new Date(data.last_push)) : 'On';
+      } else {
+        if (chip) chip.style.display = 'none';
+      }
+    } catch(_) {}
+  }, 30000);
+});
+</script>
+</body>
+</html>

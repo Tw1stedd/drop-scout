@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Alert</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #1a1a2e; color: #eee; }
+        button { 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        button:hover { background: #45a049; }
+        #result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            border-radius: 5px; 
+            display: none;
+        }
+        .success { background: #2ecc71; }
+        .error { background: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Alert System</h1>
+    <p>Click the button to create a test alert and verify the full pipeline works:</p>
+    
+    <button onclick="testAlert()">Create Test Alert</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function testAlert() {
+            const btn = event.target;
+            const result = document.getElementById('result');
+            
+            btn.disabled = true;
+            btn.textContent = 'Creating test alert...';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/test_alert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                
+                result.style.display = 'block';
+                
+                if (data.ok) {
+                    result.className = 'success';
+                    result.innerHTML = `
+                        <h3>✅ Test Alert Created!</h3>
+                        <p><strong>Name:</strong> ${data.alert.name}</p>
+                        <p><strong>Links:</strong> ${data.alert.links.length}</p>
+                        <p><strong>Price:</strong> $${data.alert.details.price}</p>
+                        <p>Go back to the main UI and refresh - you should see this alert!</p>
+                    `;
+                } else {
+                    result.className = 'error';
+                    result.innerHTML = `<h3>❌ Error</h3><p>${data.error}</p>`;
+                }
+            } catch (error) {
+                result.style.display = 'block';
+                result.className = 'error';
+                result.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
+            }
+            
+            btn.disabled = false;
+            btn.textContent = 'Create Test Alert';
+        }
+    </script>
+</body>
+</html>

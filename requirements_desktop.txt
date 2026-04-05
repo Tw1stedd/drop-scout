@@ -1,0 +1,21 @@
+# Drop Scout — Desktop Dependencies
+# Install with: pip install -r requirements_desktop.txt
+
+# Core (already installed)
+discord.py-self>=2.0
+aiohttp>=3.8
+
+# Desktop window
+pywebview>=5.0
+
+# System tray
+pystray>=0.19
+
+# Image handling (for tray icon)
+Pillow>=10.0
+
+# Build tool (for creating .exe)
+pyinstaller>=6.0
+
+# Optional: Playwright for eBay scraping
+# playwright>=1.40

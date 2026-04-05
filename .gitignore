@@ -1,0 +1,39 @@
+# ── Sensitive / Private ──────────────────────────
+monitor_config.json
+ee_config.json
+alert_history.json
+debug_history.json
+releases.json
+releases_history.json
+
+# ── Build artifacts ─────────────────────────────
+build/
+dist/
+Output/
+__pycache__/
+*.pyc
+*.pyo
+*.spec
+*.exe
+bin/
+
+# ── Installer ───────────────────────────────────
+innosetup_installer.exe
+*.msi
+
+# ── IDE / Editor ────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# ── OS files ────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ── Temp files ──────────────────────────────────
+_ui_script_tmp.js
+*.tmp
+*.log
