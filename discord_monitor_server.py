@@ -516,17 +516,66 @@ _ebay_cj = http.cookiejar.CookieJar()
 _ebay_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_ebay_cj))
 _ebay_browser_available = None  # None = untested, True/False after first attempt
 
+_EBAY_JUNK_TITLE = {
+    "new", "drop", "live", "restock", "in", "stock", "alert", "deal", "now",
+    "today", "limited", "wow", "everyone", "here", "update", "posted",
+}
+
+
+def _ebay_search_url(query: str) -> str:
+    q = urllib.parse.quote_plus((query or "").strip()[:120])
+    return (f"https://www.ebay.com/sch/i.html?_nkw={q}"
+            "&LH_Complete=1&LH_Sold=1&_ipg=60&_sop=12")
+
+
+def _clean_ebay_query(title: str = "", asin: str = "", sku: str = "") -> str:
+    """Build an eBay sold-search string from product title + identifiers."""
+    import re as _re_clean
+    raw = (title or "").strip()
+    raw = _re_clean.sub(r"https?://\S+", " ", raw)
+    raw = _re_clean.sub(r"<@!?&?\d+>", " ", raw)
+    raw = _re_clean.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
+    raw = _re_clean.sub(r"[#*_`|>]+", " ", raw)
+    raw = _re_clean.sub(r"\s+", " ", raw).strip()
+    tokens = [t for t in raw.split(" ") if len(t) > 1 and t.lower() not in _EBAY_JUNK_TITLE]
+    asin = (asin or "").strip().upper()
+    sku = (sku or "").strip()
+    sku_is_asin = bool(_re_clean.match(r"^B0[A-Z0-9]{8}$", sku, _re_clean.I))
+    ident = asin if len(asin) == 10 else (sku if sku_is_asin else "")
+    extra_sku = sku if sku and not sku_is_asin and len(sku) >= 6 else ""
+    if len(tokens) >= 2:
+        return raw[:120]
+    if len(tokens) == 1 and len(tokens[0]) >= 4:
+        base = tokens[0]
+        if ident:
+            return f"{base} {ident}"[:120]
+        if extra_sku:
+            return f"{base} {extra_sku}"[:120]
+        return base[:120]
+    if ident:
+        return ident
+    if extra_sku:
+        return extra_sku
+    return raw[:120]
+
+
 def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
     """Extract prices from eBay sold listings HTML.  Returns result dict."""
+    query = (query or "").strip()
     result = {"query": query, "prices": [], "avg": 0, "median": 0,
               "low": 0, "high": 0, "count": 0, "fetched_at": datetime.now().isoformat(),
-              "source": "ebay_sold"}
+              "source": "ebay_sold", "search_url": _ebay_search_url(query)}
+
+    if not query:
+        result["error"] = "Empty eBay search query — no title, ASIN, or SKU"
+        return result
 
     if html is None:
         encoded = urllib.parse.quote_plus(query[:120])
         # _sop=12 = End date: recent first — recent sold items
         url = (f"https://www.ebay.com/sch/i.html?_nkw={encoded}"
                "&LH_Complete=1&LH_Sold=1&_ipg=120&rt=nc&_sop=12")
+        result["search_url"] = url
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -536,9 +585,6 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
             "Accept-Encoding": "identity",
             "Referer": "https://www.ebay.com/",
             "DNT": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same_origin",
         }
         req = urllib.request.Request(url)
         for k, v in headers.items():
@@ -550,9 +596,15 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
             result["error"] = f"fetch failed: {e}"
             return result
 
-    # If we got a CAPTCHA page, mark as blocked
-    if "Pardon Our Interruption" in html[:500]:
+    # If we got a CAPTCHA page, mark as blocked — caller may try Playwright
+    head = (html or "")[:2000]
+    if ("Pardon Our Interruption" in head
+            or "captcha" in head.lower()
+            or "robot check" in head.lower()
+            or "blocked" in html[:800].lower() and "ebay" in html[:400].lower()):
         result["blocked"] = True
+        result["error"] = "eBay CAPTCHA / bot check — sold prices were not scraped"
+        result["count"] = 0
         return result
 
     prices = []
@@ -622,8 +674,9 @@ def _ebay_sold_browser(query: str) -> dict:
         from playwright.sync_api import sync_playwright
     except ImportError:
         _ebay_browser_available = False
-        return {"error": "playwright not installed", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query}
+        return {"error": "Playwright is not installed — cannot bypass eBay CAPTCHA", "count": 0,
+                "fetched_at": datetime.now().isoformat(), "query": query,
+                "blocked": True, "search_url": _ebay_search_url(query)}
 
     # Find a working Chromium binary from Playwright's cache
     chrome_paths = [
@@ -655,16 +708,15 @@ def _ebay_sold_browser(query: str) -> dict:
 
     if not chrome_exe:
         _ebay_browser_available = False
-        return {"error": "No Chromium browser found for Playwright", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query}
+        return {"error": "No Chromium browser found for Playwright (eBay CAPTCHA fallback unavailable)", "count": 0,
+                "fetched_at": datetime.now().isoformat(), "query": query,
+                "blocked": True, "search_url": _ebay_search_url(query)}
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, executable_path=chrome_exe)
             page = browser.new_page()
-            encoded = urllib.parse.quote_plus(query[:120])
-            url = (f"https://www.ebay.com/sch/i.html?_nkw={encoded}"
-                   "&LH_Complete=1&LH_Sold=1&_ipg=60&_sop=12")
+            url = _ebay_search_url(query)
             page.goto(url, wait_until="domcontentloaded", timeout=15000)
             page.wait_for_timeout(4000)  # Wait for JS rendering
 
@@ -676,27 +728,46 @@ def _ebay_sold_browser(query: str) -> dict:
     except Exception as e:
         _ebay_browser_available = False
         return {"error": f"browser fetch failed: {e}", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query}
+                "fetched_at": datetime.now().isoformat(), "query": query,
+                "blocked": True, "search_url": _ebay_search_url(query)}
 
 
 def _ebay_sold_prices(query: str) -> dict:
     """Try basic HTTP first, fall back to browser automation if blocked."""
-    result = _ebay_sold_prices_basic(query)
+    query = (query or "").strip()
+    if not query:
+        return {
+            "query": "", "count": 0, "prices": [], "avg": 0, "median": 0,
+            "error": "Empty eBay search query — no title, ASIN, or SKU",
+            "fetched_at": datetime.now().isoformat(),
+            "search_url": "https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1",
+        }
 
-    # If basic fetch was blocked and browser automation is available, try that
+    result = _ebay_sold_prices_basic(query)
+    result["query"] = query
+    result["search_url"] = result.get("search_url") or _ebay_search_url(query)
+
     if result.get("blocked") and _ebay_browser_available is not False:
         add_log("info", f"🔄 eBay blocked basic request, trying browser for: {query[:50]}...")
-        result = _ebay_sold_browser(query)
-        if result.get("count", 0) > 0:
-            add_log("info", f"✅ Browser eBay lookup found {result['count']} prices")
+        browser_result = _ebay_sold_browser(query)
+        if browser_result.get("count", 0) > 0:
+            add_log("info", f"✅ Browser eBay lookup found {browser_result['count']} prices")
+            browser_result["query"] = query
+            browser_result["search_url"] = _ebay_search_url(query)
+            return browser_result
+        err = browser_result.get("error") or result.get("error") or "eBay CAPTCHA blocked the lookup"
+        result["error"] = err
+        result["note"] = "Open the eBay Sold link to check prices in your browser."
+        result["count"] = 0
+        add_log("warning", f"eBay sold lookup failed for '{query[:60]}': {err}")
 
-    # If still no results, return with helpful info
-    if result.get("count", 0) == 0 and not result.get("error"):
-        result["note"] = "No sold listings found or eBay blocked the request. Use the eBay Sold link to check manually."
-        result["fetched_at"] = datetime.now().isoformat()
-        result["manual_url"] = (f"https://www.ebay.com/sch/i.html?_nkw="
-                                f"{urllib.parse.quote_plus(query[:120])}"
-                                "&LH_Complete=1&LH_Sold=1&_sop=12")
+    if result.get("count", 0) == 0:
+        if not result.get("error"):
+            result["error"] = result.get("note") or "No sold prices parsed for this search"
+        result["note"] = result.get("note") or "Use the eBay Sold link to check manually."
+        result["fetched_at"] = result.get("fetched_at") or datetime.now().isoformat()
+        result["search_url"] = _ebay_search_url(query)
+        result["query"] = query
 
     return result
 
@@ -1859,12 +1930,24 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/ebay-lookup":
             try:
                 data = json.loads(self.read_body())
-                query = (data.get("query") or "").strip()
+                title = (data.get("query") or data.get("title") or "").strip()
+                asin = (data.get("asin") or "").strip()
+                sku = (data.get("sku") or "").strip()
+                query = _clean_ebay_query(title, asin=asin, sku=sku)
                 if not query:
-                    self.send_json({"error": "No query"}, 400)
+                    self.send_json({
+                        "error": "No product title, ASIN, or SKU to search on eBay",
+                        "query": "",
+                        "count": 0,
+                        "prices": [],
+                        "search_url": "https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1",
+                    }, 400)
                     return
-                # Run in thread to avoid blocking server
                 result = _ebay_sold_prices(query)
+                result["query"] = query
+                if not result.get("search_url"):
+                    result["search_url"] = _ebay_search_url(query)
+                result["manual_url"] = result["search_url"]
                 self.send_json(result)
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)

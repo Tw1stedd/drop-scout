@@ -1792,7 +1792,7 @@
 
   .drop-actions {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
     gap: 8px;
     padding: 12px 16px 16px;
     margin-top: auto;
@@ -2972,6 +2972,37 @@ function pickDealUrl(parsed, details) {
   return fromBackend || '';
 }
 
+const _EBAY_JUNK = /^(new|drop|live|restock|in|stock|alert|deal|now|today|limited|wow|everyone|here|update|posted)$/i;
+
+function buildEbaySoldQuery(item) {
+  const it = item || {};
+  let title = String(it.title || '');
+  title = stripDiscordMentions(title)
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*_`|>]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const tokens = title.split(/\s+/).filter(t => t.length > 1 && !_EBAY_JUNK.test(t));
+  const asin = String(it.asin || '').trim();
+  const sku = String(it.sku || '').trim();
+  const skuIsAsin = /^B0[A-Z0-9]{8}$/i.test(sku);
+  const ident = (asin.length === 10 ? asin : '') || (skuIsAsin ? sku : '');
+  const extraSku = sku && !skuIsAsin && sku.length >= 6 ? sku : '';
+  let query = '';
+  if (tokens.length >= 2) query = title;
+  else if (tokens.length === 1 && tokens[0].length >= 4) {
+    query = ident ? `${tokens[0]} ${ident}` : (extraSku ? `${tokens[0]} ${extraSku}` : tokens[0]);
+  } else if (ident) query = ident;
+  else if (extraSku) query = extraSku;
+  else query = title;
+  query = query.replace(/\s+/g, ' ').trim().slice(0, 120);
+  const soldUrl = query
+    ? `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=12`
+    : 'https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1';
+  return { query, soldUrl };
+}
+
 function extractDropCard(entry) {
   const d = entry.details || {};
   const p = parseStructuredContent(d.content || '');
@@ -2994,6 +3025,8 @@ function extractDropCard(entry) {
     timestamp: d.created_at || d.timestamp || '',
     priority: d.priority || 'medium',
     retailer,
+    asin: d.asin || (p && p.sku && /^B0[A-Z0-9]{8}$/.test(p.sku) ? p.sku : '') || '',
+    sku: (p && p.sku) || '',
   };
 }
 
@@ -3034,6 +3067,10 @@ function renderDashboard() {
     const disc = drop.jumpUrl
       ? `<a class="drop-btn-discord" href="${escHtml(drop.jumpUrl)}" target="_blank" rel="noopener">Discord</a>`
       : `<span class="drop-btn-disabled">Discord</span>`;
+    const ebayQ = buildEbaySoldQuery(drop);
+    const ebayBtn = ebayQ.query
+      ? `<a class="drop-btn-deal" href="${escHtml(ebayQ.soldUrl)}" target="_blank" rel="noopener" title="eBay sold: ${escHtml(ebayQ.query)}">eBay</a>`
+      : `<span class="drop-btn-disabled">eBay</span>`;
     const badges = [
       ageMin < 5 ? '<span class="drop-badge new">NEW</span>' : '',
       drop.priority === 'high' ? '<span class="drop-badge urgent">URGENT</span>' : '',
@@ -3050,7 +3087,7 @@ function renderDashboard() {
           ${drop.server ? `<span>${escHtml(drop.server)}</span>` : ''}
         </div>
       </div>
-      <div class="drop-actions">${atc}${deal}${disc}</div>
+      <div class="drop-actions">${atc}${deal}${disc}${ebayBtn}</div>
     </article>`;
   }).join('');
 }
@@ -3252,11 +3289,12 @@ function renderLog(entry) {
       : '';
 
     // ── Auto search buttons from title ──────────────────────────────────────
-    const searchTitle = encodeURIComponent((title || '').substring(0, 120).trim());
-    const searchBtns = searchTitle ? `
-      <a class="qlink qlink-ebay" href="https://www.ebay.com/sch/i.html?_nkw=${searchTitle}" target="_blank" rel="noopener">🔍 eBay</a>
-      <a class="qlink qlink-amazon" href="https://www.amazon.com/s?k=${searchTitle}" target="_blank" rel="noopener">🔍 Amazon</a>
-      <a class="qlink qlink-keepa" href="https://keepa.com/#!search/1-${searchTitle}" target="_blank" rel="noopener">📊 Keepa</a>
+    const searchQ = buildEbaySoldQuery({ title, asin: d.asin || (p && p.sku) || '', sku: (p && p.sku) || '' });
+    const searchEnc = encodeURIComponent((searchQ.query || title || '').substring(0, 120).trim());
+    const searchBtns = searchEnc ? `
+      <a class="qlink qlink-ebay" href="${escHtml(searchQ.soldUrl)}" target="_blank" rel="noopener" title="${escHtml(searchQ.query)}">🔍 eBay Sold</a>
+      <a class="qlink qlink-amazon" href="https://www.amazon.com/s?k=${searchEnc}" target="_blank" rel="noopener">🔍 Amazon</a>
+      <a class="qlink qlink-keepa" href="https://keepa.com/#!search/1-${searchEnc}" target="_blank" rel="noopener">📊 Keepa</a>
     ` : '';
 
     // ── Product IDs (ASIN/TCIN) ──────────────────────────────────────────────
@@ -4160,18 +4198,44 @@ async function loadDeals() {
 const EBAY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 async function ebayLookup(deal, forceRefresh = false) {
-  // Check cache validity — expire after 30 min so prices stay current
+  const built = buildEbaySoldQuery(deal);
   if (!forceRefresh && deal.ebayData && deal.ebayData.count > 0) {
     const fetchedAt = deal.ebayData.fetched_at ? new Date(deal.ebayData.fetched_at).getTime() : 0;
     if (Date.now() - fetchedAt < EBAY_CACHE_TTL) return deal.ebayData;
   }
+  if (!built.query) {
+    const empty = {
+      error: 'No product title, ASIN, or SKU to search on eBay',
+      query: '', count: 0, prices: [], avg: 0, median: 0,
+      search_url: built.soldUrl, manual_url: built.soldUrl,
+      fetched_at: new Date().toISOString(),
+    };
+    deal.ebayData = empty;
+    _dealsState.ebayCache[deal.key] = empty;
+    return empty;
+  }
   try {
-    const data = await api.post('/api/ebay-lookup', { query: deal.title });
-    deal.ebayData = data;
-    _dealsState.ebayCache[deal.key] = data;
-    return data;
-  } catch(e) {
-    return { error: String(e), prices: [], avg: 0, count: 0 };
+    const data = await api.post('/api/ebay-lookup', {
+      query: built.query,
+      title: deal.title || '',
+      asin: deal.asin || '',
+      sku: deal.sku || '',
+    });
+    const packed = Object.assign({ count: 0, prices: [], query: built.query, search_url: built.soldUrl }, data || {});
+    if (!packed.search_url) packed.search_url = built.soldUrl;
+    packed.manual_url = packed.search_url;
+    deal.ebayData = packed;
+    _dealsState.ebayCache[deal.key] = packed;
+    return packed;
+  } catch (e) {
+    const fail = {
+      error: String(e), query: built.query, count: 0, prices: [], avg: 0, median: 0,
+      search_url: built.soldUrl, manual_url: built.soldUrl,
+      fetched_at: new Date().toISOString(),
+    };
+    deal.ebayData = fail;
+    _dealsState.ebayCache[deal.key] = fail;
+    return fail;
   }
 }
 
@@ -4288,10 +4352,11 @@ function renderDeals() {
         } catch(_){}
       }
       ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay Median <span style="color:var(--muted);font-size:9px">${fetchedAgo ? '· '+fetchedAgo : ''}</span></span><span class="deal-ebay-price">$${deal.ebayData.median.toFixed(2)}</span><span style="color:var(--muted);font-size:9px">${deal.ebayData.count} sold · avg $${deal.ebayData.avg.toFixed(2)}</span></div>`;
-    } else if (deal.ebayData && deal.ebayData.count === 0) {
-      const manualUrl = deal.ebayData.manual_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(deal.title.substring(0,100))}&LH_Complete=1&LH_Sold=1&_sop=12`;
-      const note = deal.ebayData.blocked ? 'eBay blocked — check manually' : (deal.ebayData.note || 'No sold data found');
-      ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay</span><a href="${escHtml(manualUrl)}" target="_blank" rel="noopener" class="deal-ebay-price loading" style="color:var(--yellow);text-decoration:underline;cursor:pointer;font-size:10px">${escHtml(note)}</a></div>`;
+    } else if (deal.ebayData) {
+      const manualUrl = deal.ebayData.search_url || deal.ebayData.manual_url || buildEbaySoldQuery(deal).soldUrl;
+      const usedQ = deal.ebayData.query || buildEbaySoldQuery(deal).query;
+      const why = deal.ebayData.error || (deal.ebayData.blocked ? 'eBay CAPTCHA blocked the scrape' : (deal.ebayData.note || 'No sold data found'));
+      ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay</span><a href="${escHtml(manualUrl)}" target="_blank" rel="noopener" class="deal-ebay-price loading" style="color:var(--yellow);text-decoration:underline;cursor:pointer;font-size:10px;line-height:1.35">${escHtml(why)}${usedQ ? `<br><span style="color:var(--muted);font-weight:400">searched: ${escHtml(usedQ)}</span>` : ''}</a></div>`;
     }
 
     // Profit row
@@ -4308,7 +4373,8 @@ function renderDeals() {
     }
 
     // Search query for eBay/Amazon
-    const sq = encodeURIComponent(deal.title.substring(0, 100));
+    const sqBuilt = buildEbaySoldQuery(deal);
+    const sq = encodeURIComponent(sqBuilt.query || deal.title || '');
 
     // ── Product IDs for deal card ──
     const dealPids = extractProductIds(deal.content || '', deal.links || []);
@@ -4319,8 +4385,8 @@ function renderDeals() {
     const dealPidsHtml = renderProductIdsHtml(dealPids, deal.key);
 
     // Lookup button — only shown when no eBay data yet, separate from link buttons
-    const lookupBtn = (!deal.ebayData)
-      ? `<button type="button" class="deal-lookup-btn" data-deal-key="${escHtml(deal.key)}">📊 Check eBay Price</button>`
+    const lookupBtn = (!deal.ebayData || !(deal.ebayData.count > 0))
+      ? `<button type="button" class="deal-lookup-btn" data-deal-key="${escHtml(deal.key)}">${deal.ebayData ? '📊 Retry eBay Price' : '📊 Check eBay Price'}</button>`
       : '';
 
     return `<div class="deal-card ${profitClass}" data-deal-idx="${i}">
@@ -4342,7 +4408,7 @@ function renderDeals() {
         ${deal.offerId ? `<div class="deal-offer-id"><span class="offer-id-label">Offer ID</span><code class="offer-id-value" title="Click to copy">${escHtml(deal.offerId.length > 40 ? deal.offerId.substring(0, 37) + '...' : deal.offerId)}</code><button class="offer-id-copy" data-offer-id="${escHtml(deal.offerId)}" title="Copy full Offer ID">📋</button></div>` : ''}
         ${lookupBtn}
         <div class="deal-actions">
-          <a class="deal-action-btn" href="https://www.ebay.com/sch/i.html?_nkw=${sq}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener">🔍 eBay Sold</a>
+          <a class="deal-action-btn" href="${escHtml(sqBuilt.soldUrl)}" target="_blank" rel="noopener" title="${escHtml(sqBuilt.query)}">🔍 eBay Sold</a>
           <a class="deal-action-btn" href="https://www.amazon.com/s?k=${sq}" target="_blank" rel="noopener">🅰 Amazon</a>
           <a class="deal-action-btn" href="https://keepa.com/#!search/1-${sq}" target="_blank" rel="noopener">📊 Keepa</a>
           ${deal.jumpUrl ? `<a class="deal-action-btn" href="${escHtml(deal.jumpUrl)}" target="_blank" rel="noopener">↗ Discord</a>` : ''}
@@ -5397,6 +5463,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true;
     btn.textContent = '⏳ Looking up...';
     await ebayLookup(deal);
+    if (deal.ebayData && deal.ebayData.count > 0) {
+      toast(`eBay sold: ${deal.ebayData.query} → $${deal.ebayData.median}`, 'success', 2500);
+    } else {
+      toast((deal.ebayData && (deal.ebayData.error || deal.ebayData.note)) || 'eBay lookup failed', 'error', 4500);
+    }
     renderDeals();
   }, true);
 
