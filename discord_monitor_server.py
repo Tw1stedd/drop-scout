@@ -2045,6 +2045,110 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
 
+        elif path == "/api/test_alert":
+            # Seed demo alerts for Dashboard / UI checks. Does not touch the Discord gateway.
+            try:
+                now = datetime.now()
+                samples = [
+                    {
+                        "message": "🚨 Match in #amazon-restocks",
+                        "details": {
+                            "server": "Flip Alerts",
+                            "channel": "amazon-restocks",
+                            "author": "RestockBot",
+                            "keywords": ["pokemon", "restock"],
+                            "content": (
+                                "Pokemon TCG Prismatic Evolutions Elite Trainer Box\n"
+                                "SKU\nB0DH1ZW4MM\n"
+                                "Price\n$54.99\n"
+                                "Seller\nAmazon.com\n"
+                                "Add to Cart\n"
+                                "[Add to Cart](https://www.amazon.com/checkout/entry/buynow?asin=B0DH1ZW4MM)\n"
+                                "Links\n"
+                                "[Amazon](https://www.amazon.com/dp/B0DH1ZW4MM) [eBay](https://www.ebay.com/sch/i.html?_nkw=prismatic+evolutions+etb)"
+                            ),
+                            "jump_url": "https://discord.com/channels/1/2/3",
+                            "timestamp": now.isoformat(),
+                            "created_at": now.isoformat(),
+                            "image_urls": ["https://m.media-amazon.com/images/I/81Q7rGaLYdL._AC_SL1500_.jpg"],
+                            "links": ["https://www.amazon.com/dp/B0DH1ZW4MM"],
+                            "priority": "high",
+                            "asin": "B0DH1ZW4MM",
+                        },
+                    },
+                    {
+                        "message": "🔔 Match in #target-drops",
+                        "details": {
+                            "server": "Flip Alerts",
+                            "channel": "target-drops",
+                            "author": "DropPing",
+                            "keywords": ["hot wheels"],
+                            "content": (
+                                "# Hot Wheels Premium Boulevard Mix\n"
+                                "Just hit Target online — limited per household.\n"
+                                "[ATC](https://www.target.com/p/hot-wheels/-/A-12345678)\n"
+                                "https://www.target.com/p/hot-wheels/-/A-12345678"
+                            ),
+                            "jump_url": "https://discord.com/channels/1/4/5",
+                            "timestamp": (now - timedelta(minutes=2)).isoformat(),
+                            "created_at": (now - timedelta(minutes=2)).isoformat(),
+                            "image_urls": ["https://target.scene7.com/is/image/Target/GUEST_hotwheels"],
+                            "links": ["https://www.target.com/p/hot-wheels/-/A-12345678"],
+                            "priority": "medium",
+                        },
+                    },
+                    {
+                        "message": "🔔 Match in #walmart-deals",
+                        "details": {
+                            "server": "Flip Alerts",
+                            "channel": "walmart-deals",
+                            "author": "Scout",
+                            "keywords": ["lego"],
+                            "content": (
+                                "LEGO Star Wars UCS set clearance\n"
+                                "Price\n$89.00\n"
+                                "Recommended Price\n$159.99\n"
+                                "Links\n"
+                                "[Walmart](https://www.walmart.com/ip/lego-star-wars/123456789) [eBay Sold](https://www.ebay.com/sch/i.html?_nkw=lego+star+wars+ucs&LH_Sold=1)"
+                            ),
+                            "jump_url": "https://discord.com/channels/1/6/7",
+                            "timestamp": (now - timedelta(minutes=8)).isoformat(),
+                            "created_at": (now - timedelta(minutes=8)).isoformat(),
+                            "image_urls": [],
+                            "links": ["https://www.walmart.com/ip/lego-star-wars/123456789"],
+                            "priority": "medium",
+                        },
+                    },
+                    {
+                        "message": "📬 New post in #exclusive",
+                        "details": {
+                            "server": "VIP Drops",
+                            "channel": "exclusive",
+                            "author": "mod",
+                            "keywords": ["[monitor all]"],
+                            "content": (
+                                "Monster High Haunt Couture restock rumor — watch the product page.\n"
+                                "https://www.amazon.com/dp/B0CXYZ1234"
+                            ),
+                            "jump_url": "https://discord.com/channels/8/9/10",
+                            "timestamp": (now - timedelta(minutes=18)).isoformat(),
+                            "created_at": (now - timedelta(minutes=18)).isoformat(),
+                            "image_urls": [],
+                            "links": ["https://www.amazon.com/dp/B0CXYZ1234"],
+                            "priority": "low",
+                            "asin": "B0CXYZ1234",
+                        },
+                    },
+                ]
+                last = None
+                for s in samples:
+                    last = add_log("alert", s["message"], s["details"])
+                    state["alert_count"] += 1
+                    state["last_alert_at"] = datetime.now().isoformat()
+                self.send_json({"ok": True, "count": len(samples), "alert": last})
+            except Exception as e:
+                self.send_json({"error": str(e)}, 400)
+
         elif path == "/api/test_ntfy":
             try:
                 data = json.loads(self.read_body())

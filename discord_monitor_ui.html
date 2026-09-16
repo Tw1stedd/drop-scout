@@ -17,26 +17,27 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:       #0a0b0f;
-    --surface:  #0f1117;
-    --panel:    #13161e;
-    --border:   #1e2330;
-    --border2:  #252b3b;
-    --text:     #c8d0e8;
-    --muted:    #4a5270;
-    --accent:   #5865f2;
-    --accent2:  #7289da;
-    --green:    #3ba55c;
-    --yellow:   #faa61a;
-    --red:      #ed4245;
-    --cyan:     #00b0f4;
-    --purple:   #9b59b6;
-    --glow:     rgba(88,101,242,0.15);
-    --glow2:    rgba(88,101,242,0.06);
+    --bg:       #07080c;
+    --surface:  #0c0e14;
+    --panel:    #12151e;
+    --border:   #1c2230;
+    --border2:  #2a3144;
+    --text:     #e4e9f7;
+    --muted:    #7a84a3;
+    --accent:   #6d7cff;
+    --accent2:  #8b9bff;
+    --green:    #3dd68c;
+    --yellow:   #ffc14a;
+    --red:      #ff5d62;
+    --cyan:     #4ecbff;
+    --purple:   #c084fc;
+    --glow:     rgba(109,124,255,0.22);
+    --glow2:    rgba(109,124,255,0.08);
     --font-mono: 'JetBrains Mono', monospace;
     --font-ui:   'Syne', sans-serif;
-    --radius:    10px;
-    --radius-sm: 6px;
+    --radius:    16px;
+    --radius-sm: 10px;
+    --tap:      48px;
   }
 
   html, body {
@@ -56,10 +57,14 @@
   /* ── Layout ── */
   #app {
     display: grid;
-    grid-template-rows: 52px 1fr;
-    grid-template-columns: 280px 1fr;
+    grid-template-rows: 60px 1fr;
+    grid-template-columns: 300px 1fr;
     height: 100vh;
     gap: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(109,124,255,0.14), transparent 55%),
+      radial-gradient(900px 500px at 0% 100%, rgba(61,214,140,0.06), transparent 50%),
+      var(--bg);
   }
 
   /* ── Header ── */
@@ -68,13 +73,46 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
-    background: rgba(15,17,23,0.82);
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    border-bottom: 1px solid rgba(88,101,242,0.12);
+    gap: 16px;
+    padding: 0 22px;
+    background: rgba(8,10,16,0.78);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-bottom: 1px solid rgba(109,124,255,0.14);
     position: relative;
     z-index: 10;
+  }
+
+  .view-switch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(18,21,30,0.9);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .view-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 8px 18px;
+    min-height: 36px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .view-btn:hover { color: var(--text); }
+  .view-btn.active {
+    background: linear-gradient(135deg, var(--accent), #4f5dff);
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(109,124,255,0.35);
   }
 
   .logo {
@@ -86,6 +124,7 @@
     font-weight: 700;
     letter-spacing: -0.3px;
     color: #fff;
+    flex-shrink: 0;
   }
 
   .logo-icon {
@@ -110,6 +149,7 @@
     min-width: 0;
     overflow: hidden;
     flex-shrink: 1;
+    margin-left: auto;
   }
 
   .status-badge {
@@ -377,11 +417,12 @@
 
   /* ── Main Area ── */
   #main {
-    display: flex;
+    display: none;
     flex-direction: column;
     background: var(--bg);
     overflow: hidden;
   }
+  #main.active-view { display: flex; }
 
   /* ── Log Toolbar ── */
   .log-toolbar {
@@ -1227,17 +1268,19 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     MOBILE BREAKPOINT (≤ 768px)
+     TABLET + PHONE (≤ 1180px) — wall display, settings as drawer
      ══════════════════════════════════════════════════════════ */
-  @media (max-width: 768px) {
+  @media (max-width: 1180px) {
     #app {
       grid-template-columns: 1fr;
-      grid-template-rows: 48px 1fr;
-      padding-bottom: 60px; /* space for bottom nav */
+      grid-template-rows: 56px 1fr;
+      padding-bottom: 64px; /* space for bottom nav */
     }
 
     /* Header — compact */
-    #header { padding: 0 10px; height: 48px; }
+    #header { padding: 0 12px; height: 56px; }
+    .view-switch { padding: 3px; }
+    .view-btn { padding: 8px 14px; font-size: 12px; min-height: 34px; }
     .logo { font-size: 14px; gap: 8px; }
     .logo-icon { width: 26px; height: 26px; border-radius: 6px; }
     .logo-icon svg { width: 26px; height: 26px; }
@@ -1267,9 +1310,13 @@
     #mobile-bottom-nav { display: block; }
     .mobile-status-bar { display: flex; }
 
-    /* Main area — full width on mobile (sidebar is position:fixed, out of grid) */
-    #main { grid-column: 1 / -1; grid-row: 2; }
-    #deals-container { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+    /* Main area — full width (sidebar is position:fixed, out of grid) */
+    #main, #deals-container, #dashboard-container { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+    .dash-hero { padding: 18px 18px 6px; }
+    .dash-scroll { padding: 8px 16px 24px; }
+    .dash-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .drop-media { height: 190px; }
+    .drop-title { font-size: 18px; }
 
     /* Log toolbar — stacked */
     .log-toolbar {
@@ -1558,6 +1605,214 @@
   }
   .empty-state-action:hover { background: var(--accent2); }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     DASHBOARD WALL (tablet-first)
+     ═══════════════════════════════════════════════════════════════════════ */
+  #dashboard-container {
+    display: none;
+    overflow: hidden;
+    flex-direction: column;
+    background: transparent;
+    grid-column: 2;
+    grid-row: 2;
+  }
+  #dashboard-container.active { display: flex; }
+
+  .dash-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 28px 10px;
+    flex-shrink: 0;
+  }
+  .dash-hero h1 {
+    font-family: var(--font-ui);
+    font-size: clamp(28px, 3.4vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: #fff;
+    line-height: 1;
+  }
+  .dash-hero p {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    max-width: 52ch;
+  }
+  .dash-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(18,21,30,0.75);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .dash-live .pulse {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .dash-live.is-on .pulse {
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  .dash-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 24px 28px;
+  }
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+  }
+  @media (min-width: 900px) {
+    .dash-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  }
+  @media (min-width: 1400px) {
+    .dash-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .drop-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 420px;
+    border-radius: 22px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(24,28,40,0.92), rgba(12,14,20,0.96));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .drop-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(109,124,255,0.35);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(109,124,255,0.15);
+  }
+  .drop-card.is-fresh {
+    border-color: rgba(61,214,140,0.45);
+    box-shadow: 0 0 0 1px rgba(61,214,140,0.25), 0 20px 50px rgba(61,214,140,0.12);
+  }
+  .drop-card.pri-high { outline: 2px solid rgba(255,93,98,0.45); }
+
+  .drop-media {
+    position: relative;
+    height: 210px;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(109,124,255,0.25), transparent 50%),
+      linear-gradient(160deg, #1a1f2e, #0b0d12);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .drop-media img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .drop-media .drop-fallback {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 56px; opacity: 0.7;
+  }
+  .drop-badges {
+    position: absolute; top: 12px; left: 12px; right: 12px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .drop-badge {
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    letter-spacing: 0.02em;
+  }
+  .drop-badge.new { background: var(--green); color: #062; }
+  .drop-badge.urgent { background: var(--red); }
+  .drop-badge.retailer { background: rgba(109,124,255,0.85); }
+
+  .drop-body { padding: 16px 18px 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .drop-title {
+    font-family: var(--font-ui);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #fff;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .drop-meta {
+    display: flex; flex-wrap: wrap; gap: 10px 14px;
+    font-size: 12px; color: var(--muted); font-weight: 500;
+  }
+  .drop-meta .time { color: var(--cyan); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .drop-price {
+    font-family: var(--font-ui);
+    font-size: 26px; font-weight: 800; color: var(--green);
+    letter-spacing: -0.03em;
+  }
+
+  .drop-actions {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 8px;
+    padding: 12px 16px 16px;
+    margin-top: auto;
+  }
+  .drop-actions a, .drop-actions .drop-btn-disabled {
+    display: flex; align-items: center; justify-content: center;
+    min-height: var(--tap);
+    border-radius: 14px;
+    font-family: var(--font-ui);
+    font-size: 14px; font-weight: 800;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+  }
+  .drop-btn-atc {
+    background: linear-gradient(180deg, #4ae89c, var(--green));
+    color: #042; box-shadow: 0 8px 22px rgba(61,214,140,0.28);
+  }
+  .drop-btn-atc:hover { filter: brightness(1.06); }
+  .drop-btn-deal {
+    background: rgba(109,124,255,0.18);
+    border: 1px solid rgba(109,124,255,0.4);
+    color: #dce2ff;
+  }
+  .drop-btn-discord {
+    background: rgba(88,101,242,0.16);
+    border: 1px solid rgba(88,101,242,0.4);
+    color: #cfd5ff;
+  }
+  .drop-btn-disabled {
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    border: 1px dashed var(--border2);
+    pointer-events: none;
+  }
+
+  .dash-empty {
+    height: 100%;
+    min-height: 360px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 10px; color: var(--muted); padding: 40px;
+  }
+  .dash-empty h2 {
+    font-family: var(--font-ui); font-size: 32px; color: #fff; font-weight: 800;
+  }
+
+  .btn-atc { min-height: 40px; font-size: 13px; }
+
   /* ── Pulse animation for live status ── */
   @keyframes pulse-live {
     0%, 100% { transform: scale(1); }
@@ -1636,9 +1891,8 @@
   @media (min-width:1400px) { .deals-grid { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); } }
 
   /* ── Mobile overrides for deals (must come AFTER base deals styles) ── */
-  @media (max-width: 768px) {
-    #deals-container { grid-column: 1 / -1; grid-row: 2; width: 100%; }
-    #main { grid-column: 1 / -1; grid-row: 2; }
+  @media (max-width: 1180px) {
+    #deals-container, #dashboard-container, #main { grid-column: 1 / -1; grid-row: 2; width: 100%; }
     .deals-grid { grid-template-columns: 1fr; gap: 12px; }
     .deal-img-wrap { height: 160px; }
     .deal-body { padding: 12px; }
@@ -1673,7 +1927,13 @@
       Drop Scout
     </div>
 
-    <button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open settings">☰</button>
+
+    <nav class="view-switch" id="view-switch" aria-label="Main views">
+      <button type="button" class="view-btn active" data-view="dashboard">Dashboard</button>
+      <button type="button" class="view-btn" data-view="feed">Feed</button>
+      <button type="button" class="view-btn" data-view="deals">Deals</button>
+    </nav>
 
     <div class="header-status">
       <div class="stat-chips">
@@ -2105,6 +2365,20 @@
     </div>
   </aside>
 
+  <!-- ── DASHBOARD WALL ── -->
+  <section id="dashboard-container" class="active">
+    <div class="dash-hero">
+      <div>
+        <h1>Live drops</h1>
+        <p>Tablet wall — tap ATC, Deal, or Discord. Newest restocks stay on top.</p>
+      </div>
+      <div class="dash-live" id="dash-live"><span class="pulse"></span><span id="dash-live-label">Monitor offline</span></div>
+    </div>
+    <div class="dash-scroll">
+      <div id="dash-grid" class="dash-grid"></div>
+    </div>
+  </section>
+
   <!-- ── MAIN LOG AREA ── -->
   <main id="main">
     <div class="log-toolbar">
@@ -2163,9 +2437,9 @@
 <!-- Mobile Bottom Navigation -->
 <nav id="mobile-bottom-nav">
   <div class="mob-nav-inner">
-    <button class="mob-nav-btn active" data-mob-tab="control">🎮<span>Control</span></button>
-    <button class="mob-nav-btn" data-mob-tab="config">⚙️<span>Config</span></button>
-    <button class="mob-nav-btn" data-mob-tab="channels">📺<span>Channels</span></button>
+    <button class="mob-nav-btn active" data-mob-tab="dashboard">🖥<span>Dash</span></button>
+    <button class="mob-nav-btn" data-mob-tab="control">🎮<span>Control</span></button>
+    <button class="mob-nav-btn" data-mob-tab="feed">📡<span>Feed</span></button>
     <button class="mob-nav-btn" data-mob-tab="deals">💰<span>Deals</span></button>
     <button class="mob-nav-btn" data-mob-tab="stats">📊<span>Stats</span></button>
   </div>
@@ -2200,6 +2474,7 @@ const S = {
   webhooks: [],             // [{url, name, enabled}]
   flipLog: JSON.parse(localStorage.getItem('dm_flip_log') || '[]'),
   statsInterval: null,
+  activeView: 'dashboard',
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -2554,6 +2829,120 @@ function parseStructuredContent(raw) {
   return result;
 }
 
+function pickDealUrl(parsed, details) {
+  const fromParsed = (parsed && parsed.productUrls || []).find(u => u && !/discord\.com|cdn\.discord/i.test(u));
+  if (fromParsed) return fromParsed;
+  const fromLinks = (parsed && parsed.links || []).find(l => l && l.url && !/discord\.com|cdn\.discord/i.test(l.url));
+  if (fromLinks) return fromLinks.url;
+  const fromBackend = (details.links || []).find(u => u && !/discord\.com|cdn\.discord|(\.jpg|\.png|\.webp|\.gif)(\?|$)/i.test(u));
+  return fromBackend || '';
+}
+
+function extractDropCard(entry) {
+  const d = entry.details || {};
+  const p = parseStructuredContent(d.content || '');
+  const rawTitle = (p && p.title) || (d.content || '').split('\n')[0].replace(/^#+\s*/, '') || '(no content)';
+  const title = stripDiscordMentions(rawTitle).replace(/^#+\s*/, '') || '(no content)';
+  const atcUrl = (p && p.atcUrl) || '';
+  const dealUrl = pickDealUrl(p, d);
+  const img = (d.image_urls || []).find(u => u && !/\.(gif|svg)(\?|$)/i.test(u)) || '';
+  const retailer = detectRetailer(atcUrl || dealUrl);
+  return {
+    id: entry.id,
+    title,
+    price: (p && p.price) || '',
+    atcUrl,
+    dealUrl,
+    jumpUrl: d.jump_url || '',
+    img,
+    channel: d.channel || '',
+    server: d.server || '',
+    timestamp: d.created_at || d.timestamp || '',
+    priority: d.priority || 'medium',
+    retailer,
+  };
+}
+
+function retailerEmoji(drop) {
+  if (drop.retailer) return drop.retailer.icon;
+  if (/amazon/i.test(drop.atcUrl + drop.dealUrl + drop.title)) return '🅰';
+  if (/target/i.test(drop.atcUrl + drop.dealUrl + drop.title)) return '🎯';
+  if (/walmart/i.test(drop.atcUrl + drop.dealUrl + drop.title)) return '🏪';
+  return '📦';
+}
+
+function renderDashboard() {
+  const grid = document.getElementById('dash-grid');
+  if (!grid) return;
+  const alerts = S.logs.filter(l => l && l.level === 'alert' && l.details).slice(0, 24);
+  if (!alerts.length) {
+    grid.innerHTML = `<div class="dash-empty" style="grid-column:1/-1">
+      <h2>Waiting for drops</h2>
+      <p>Start the monitor from Control. New restocks land here as large tap cards.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = alerts.map(entry => {
+    const drop = extractDropCard(entry);
+    const ageMin = minutesAgo(drop.timestamp);
+    const fresh = ageMin < 1.5;
+    const timeLabel = drop.timestamp ? formatTimeAgo(new Date(drop.timestamp)) : (entry.time || '');
+    const clock = drop.timestamp ? new Date(drop.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (entry.time || '');
+    const media = drop.img
+      ? `<img src="${escHtml(drop.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=drop-fallback>📦</div>'">`
+      : `<div class="drop-fallback">${retailerEmoji(drop)}</div>`;
+    const atc = drop.atcUrl
+      ? `<a class="drop-btn-atc" href="${escHtml(drop.atcUrl)}" target="_blank" rel="noopener">🛒 ATC</a>`
+      : `<span class="drop-btn-disabled">No ATC</span>`;
+    const deal = drop.dealUrl
+      ? `<a class="drop-btn-deal" href="${escHtml(drop.dealUrl)}" target="_blank" rel="noopener">Deal</a>`
+      : `<span class="drop-btn-disabled">Deal</span>`;
+    const disc = drop.jumpUrl
+      ? `<a class="drop-btn-discord" href="${escHtml(drop.jumpUrl)}" target="_blank" rel="noopener">Discord</a>`
+      : `<span class="drop-btn-disabled">Discord</span>`;
+    const badges = [
+      ageMin < 5 ? '<span class="drop-badge new">NEW</span>' : '',
+      drop.priority === 'high' ? '<span class="drop-badge urgent">URGENT</span>' : '',
+      drop.retailer ? `<span class="drop-badge retailer">${escHtml(drop.retailer.icon + ' ' + drop.retailer.name)}</span>` : '',
+    ].join('');
+    return `<article class="drop-card${fresh ? ' is-fresh' : ''}${drop.priority === 'high' ? ' pri-high' : ''}">
+      <div class="drop-media">${media}<div class="drop-badges">${badges}</div></div>
+      <div class="drop-body">
+        <div class="drop-title">${escHtml(drop.title)}</div>
+        ${drop.price ? `<div class="drop-price">${escHtml(drop.price)}</div>` : ''}
+        <div class="drop-meta">
+          <span class="time">${escHtml(clock)} · ${escHtml(timeLabel)}</span>
+          ${drop.channel ? `<span>#${escHtml(drop.channel)}</span>` : ''}
+          ${drop.server ? `<span>${escHtml(drop.server)}</span>` : ''}
+        </div>
+      </div>
+      <div class="drop-actions">${atc}${deal}${disc}</div>
+    </article>`;
+  }).join('');
+}
+
+function syncViewButtons(view) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  const mobMap = { dashboard: 'dashboard', logs: 'feed', feed: 'feed', deals: 'deals' };
+  const mob = mobMap[view] || 'dashboard';
+  document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mobTab === mob));
+}
+
+function switchMainView(view) {
+  S.activeView = view;
+  const dash = document.getElementById('dashboard-container');
+  const main = document.getElementById('main');
+  const deals = document.getElementById('deals-container');
+  dash.classList.toggle('active', view === 'dashboard');
+  main.classList.toggle('active-view', view === 'logs' || view === 'feed');
+  deals.classList.toggle('active', view === 'deals');
+  _dealsState.activeView = view === 'deals' ? 'deals' : (view === 'dashboard' ? 'dashboard' : 'logs');
+  syncViewButtons(view === 'feed' ? 'feed' : view);
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'logs' || view === 'feed') rebuildLogs();
+  if (view === 'deals') loadDeals();
+}
+
 // ── Log rendering ──────────────────────────────────────────────────────────
 const levelIcons = { alert: '🔔', success: '✅', error: '❌', warning: '⚠️', info: '◦' };
 
@@ -2890,11 +3279,10 @@ async function pollOnce() {
       S.logs = logs;
       S.lastTopId = newTopId;
       updateAlertCount(newCount);
-      rebuildLogs();
-      // Auto-refresh deals view when new alerts come in
-      if (_dealsState.activeView === 'deals') {
-        loadDeals();
-      }
+      // Rebuild only the visible surface so the alert path stays cheap.
+      if (S.activeView === 'dashboard') renderDashboard();
+      else if (S.activeView === 'logs' || S.activeView === 'feed') rebuildLogs();
+      else if (S.activeView === 'deals') loadDeals();
     }
 
     // Update remote access UI from poll
@@ -2988,6 +3376,10 @@ function updateStatus(running) {
   btnStart.style.display = running ? 'none' : '';
   btnStop.style.display = running ? '' : 'none';
   uptime.classList.toggle('visible', running);
+  const dashLive = document.getElementById('dash-live');
+  const dashLbl = document.getElementById('dash-live-label');
+  if (dashLive) dashLive.classList.toggle('is-on', !!running);
+  if (dashLbl) dashLbl.textContent = running ? 'Live monitoring' : 'Monitor offline';
 
   if (!running && S.uptimeInterval) {
     clearInterval(S.uptimeInterval);
@@ -3413,7 +3805,14 @@ async function loadAll() {
     S.logs = initLogs;
     S.lastTopId = initLogs.length ? initLogs[0].id : 0;
     updateAlertCount(logData.alert_count || 0);
-    rebuildLogs();
+    if (new URLSearchParams(location.search).has('demo') && !S.logs.some(l => l.level === 'alert')) {
+      await api.post('/api/test_alert', {});
+      const seeded = await api.get('/api/logs');
+      S.logs = Array.isArray(seeded.logs) ? seeded.logs : S.logs;
+      S.lastTopId = S.logs.length ? S.logs[0].id : 0;
+      updateAlertCount(seeded.alert_count || S.alertCount);
+    }
+    renderDashboard();
 
   } catch(e) {
     toast('Could not connect to server. Is the Drop Scout server running?', 'error', 6000);
@@ -3820,18 +4219,8 @@ function renderDeals() {
   }).join('');
 }
 
-function switchToDealsView() {
-  _dealsState.activeView = 'deals';
-  document.getElementById('main').style.display = 'none';
-  document.getElementById('deals-container').classList.add('active');
-  loadDeals();
-}
-
-function switchToLogsView() {
-  _dealsState.activeView = 'logs';
-  document.getElementById('main').style.display = '';
-  document.getElementById('deals-container').classList.remove('active');
-}
+function switchToDealsView() { switchMainView('deals'); }
+function switchToLogsView() { switchMainView('feed'); }
 
 // ── Polling ────────────────────────────────────────────────────────────────
 function startPolling() {
@@ -3899,20 +4288,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.mob-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.mobTab;
-      // Update bottom nav active state
-      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      // Trigger the sidebar nav-tab click
-      const navTab = document.querySelector(`.nav-tab[data-tab="${tab}"]`);
-      if (navTab) navTab.click();
-      // Deals/stats switch the main view — keep sidebar closed
-      // Other tabs open the sidebar drawer to show settings
-      if (tab === 'deals' || tab === 'stats') {
-        closeMobileSidebar();
-      } else {
+      if (tab === 'dashboard') { switchMainView('dashboard'); closeMobileSidebar(); }
+      else if (tab === 'feed') { switchMainView('feed'); closeMobileSidebar(); }
+      else if (tab === 'deals') { switchMainView('deals'); closeMobileSidebar(); }
+      else {
+        const navTab = document.querySelector(`.nav-tab[data-tab="${tab}"]`);
+        if (navTab) navTab.click();
         openMobileSidebar();
       }
+      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.toggle('active', b === btn));
     });
+  });
+
+  document.getElementById('view-switch')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.view-btn');
+    if (!btn) return;
+    const view = btn.dataset.view === 'feed' ? 'feed' : btn.dataset.view;
+    switchMainView(view);
   });
 
   // Sound toggle
@@ -3953,9 +4345,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = tab.dataset.tab;
       // Stats tab — fetch fresh data
       if (t === 'stats') setTimeout(() => { fetchStats(); fetchHistory(); renderFlipLog(); }, 100);
-      // Deals tab — switch main view
-      if (t === 'deals') switchToDealsView();
-      else if (_dealsState.activeView === 'deals') switchToLogsView();
+      // Deals sidebar tab opens the analyzer canvas; other settings stay on the current wall
+      if (t === 'deals') switchMainView('deals');
       // Sync tab — load status + devices
       if (t === 'sync') { loadSyncStatus(); loadSyncDevices(); }
       // Close mobile sidebar + overlay
