@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Drop Scout">
@@ -41,13 +41,18 @@
     --radius:    16px;
     --radius-sm: 10px;
     --tap:      48px;
+    --app-h:    100dvh;
+    --safe-t:   env(safe-area-inset-top, 0px);
+    --safe-r:   env(safe-area-inset-right, 0px);
+    --safe-b:   env(safe-area-inset-bottom, 0px);
+    --safe-l:   env(safe-area-inset-left, 0px);
   }
 
   html, body {
     height: 100%;
-    height: 100dvh;
-    min-height: 100dvh;
-    min-height: -webkit-fill-available;
+    height: var(--app-h, 100dvh);
+    max-height: var(--app-h, 100dvh);
+    min-height: 0;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-mono);
@@ -55,9 +60,7 @@
     overflow: hidden;
   }
   html { -webkit-text-size-adjust: 100%; }
-  body {
-    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
-  }
+  body { padding: 0; }
 
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 4px; }
@@ -70,8 +73,11 @@
     grid-template-rows: 60px 1fr;
     grid-template-columns: 300px 1fr;
     height: 100%;
-    height: 100dvh;
-    min-height: -webkit-fill-available;
+    height: var(--app-h, 100dvh);
+    max-height: var(--app-h, 100dvh);
+    min-height: 0;
+    width: 100%;
+    padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
     gap: 0;
     background:
       radial-gradient(1200px 600px at 80% -10%, rgba(109,124,255,0.14), transparent 55%),
@@ -1640,6 +1646,9 @@
     background: transparent;
     grid-column: 2;
     grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
   }
   #dashboard-container.active { display: flex; }
 
@@ -1898,22 +1907,38 @@
   @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
     html, body, #app {
       height: 100%;
-      height: 100dvh;
-      min-height: 100dvh;
-      min-height: -webkit-fill-available;
+      height: var(--app-h, 100dvh);
+      max-height: var(--app-h, 100dvh);
+      min-height: 0;
     }
   }
   html.pwa-standalone #app,
   html.is-fullscreen #app,
   html.immersive #app {
     grid-template-columns: 1fr;
+    grid-template-rows: 48px 1fr;
+    padding-bottom: var(--safe-b);
   }
   html.immersive #sidebar,
-  html.is-fullscreen #sidebar { display: none !important; }
+  html.is-fullscreen #sidebar,
+  html.pwa-standalone #sidebar { display: none !important; }
   html.immersive #mobile-bottom-nav,
-  html.is-fullscreen #mobile-bottom-nav { display: none !important; }
-  html.immersive #app,
-  html.is-fullscreen #app { padding-bottom: 0; grid-template-columns: 1fr; }
+  html.is-fullscreen #mobile-bottom-nav,
+  html.pwa-standalone #mobile-bottom-nav { display: none !important; }
+  html.is-fullscreen #dashboard-container,
+  html.immersive #dashboard-container,
+  html.pwa-standalone #dashboard-container,
+  html.is-fullscreen #deals-container,
+  html.immersive #deals-container,
+  html.is-fullscreen #main,
+  html.immersive #main {
+    grid-column: 1 / -1 !important;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+  }
   html.is-fullscreen .view-switch,
   html.immersive .view-switch,
   html.is-fullscreen .mobile-menu-btn,
@@ -1921,16 +1946,78 @@
   html.is-fullscreen .stat-chips,
   html.immersive .stat-chips { display: none !important; }
   html.is-fullscreen #header,
-  html.immersive #header { height: 48px; padding: 0 12px; }
+  html.immersive #header { height: 48px; min-height: 48px; padding: 0 12px; }
   html.is-fullscreen .dash-hero p,
   html.immersive .dash-hero p { display: none; }
   html.is-fullscreen .dash-hero,
-  html.immersive .dash-hero { padding: 10px 16px 6px; }
+  html.immersive .dash-hero { padding: 8px 16px 4px; }
+  html.is-fullscreen .dash-scroll,
+  html.immersive .dash-scroll { padding: 8px 16px 16px; }
+
+  /* Lenovo / Android landscape: hide remaining chrome, fill visual viewport, row cards */
   @media (orientation: landscape) {
-    html.is-fullscreen .drop-media,
-    html.immersive .drop-media { height: 160px; }
+    html.is-fullscreen #header,
+    html.immersive #header { display: none !important; }
+    html.is-fullscreen #app,
+    html.immersive #app,
+    html.pwa-standalone #app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+    html.is-fullscreen #dashboard-container,
+    html.immersive #dashboard-container,
+    html.pwa-standalone #dashboard-container {
+      grid-column: 1 / -1 !important;
+      grid-row: 1 / -1 !important;
+    }
+    html.is-fullscreen .dash-hero,
+    html.immersive .dash-hero { padding: 6px 12px 4px; }
+    html.is-fullscreen .dash-hero h1,
+    html.immersive .dash-hero h1 { font-size: 22px; }
+    html.is-fullscreen .dash-grid,
+    html.immersive .dash-grid {
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+      gap: 12px;
+    }
     html.is-fullscreen .drop-card,
-    html.immersive .drop-card { min-height: 340px; }
+    html.immersive .drop-card {
+      flex-direction: row;
+      align-items: stretch;
+      min-height: 0;
+      max-height: min(280px, calc(var(--app-h, 100dvh) - 96px));
+    }
+    html.is-fullscreen .drop-media,
+    html.immersive .drop-media {
+      width: min(240px, 38%);
+      height: auto;
+      min-height: 0;
+      align-self: stretch;
+    }
+    html.is-fullscreen .drop-media img,
+    html.is-fullscreen .drop-photo,
+    html.immersive .drop-media img,
+    html.immersive .drop-photo {
+      object-fit: contain;
+      object-position: center;
+      max-height: 100%;
+    }
+    html.is-fullscreen .drop-body,
+    html.immersive .drop-body { padding: 12px 14px 6px; min-width: 0; }
+    html.is-fullscreen .drop-title,
+    html.immersive .drop-title { font-size: 16px; }
+    html.is-fullscreen .drop-actions,
+    html.immersive .drop-actions {
+      grid-template-columns: 1.3fr 1fr 1fr 1fr;
+      padding: 8px 12px 12px;
+    }
+  }
+  @media (orientation: landscape) and (min-width: 1600px) {
+    html.is-fullscreen .dash-grid,
+    html.immersive .dash-grid {
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+    }
+    html.is-fullscreen .drop-card,
+    html.immersive .drop-card { max-height: min(320px, calc(var(--app-h, 100dvh) - 88px)); }
   }
 
   .dash-empty h2 {
@@ -4489,7 +4576,42 @@ function fsElement() {
     || null;
 }
 
+function syncViewportHeight() {
+  const vv = window.visualViewport;
+  const h = Math.round((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight);
+  if (h > 0) document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+
+function isPortraitNow() {
+  try {
+    if (screen.orientation && screen.orientation.type) {
+      return String(screen.orientation.type).startsWith('portrait');
+    }
+  } catch (_) {}
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia('(orientation: portrait)').matches;
+  }
+  return window.innerHeight > window.innerWidth;
+}
+
+async function maybeLockLandscape() {
+  if (!isPortraitNow()) return;
+  const ori = screen.orientation;
+  if (!ori || typeof ori.lock !== 'function') return;
+  try { await ori.lock('landscape'); } catch (_) {}
+}
+
+function tryRequestFullscreen(el) {
+  if (!el) return null;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.msRequestFullscreen;
+  if (typeof req !== 'function') return null;
+  try { return req.call(el, { navigationUI: 'hide' }); } catch (_) {
+    try { return req.call(el); } catch (e) { return Promise.reject(e); }
+  }
+}
+
 function updateFullscreenUi() {
+  syncViewportHeight();
   const on = !!(fsElement() || document.documentElement.classList.contains('immersive'));
   const standalone = isStandaloneDisplay();
   document.documentElement.classList.toggle('is-fullscreen', !!fsElement());
@@ -4521,31 +4643,26 @@ async function enterDashboardFullscreen() {
     toast('Already in home-screen mode', 'info', 1800);
     return;
   }
-  const root = document.documentElement;
-  const req = root.requestFullscreen || root.webkitRequestFullscreen || root.webkitRequestFullScreen || root.msRequestFullscreen;
+  const targets = [document.documentElement, document.getElementById('app'), document.body].filter(Boolean);
   let apiOk = false;
-  if (typeof req === 'function') {
+  for (const el of targets) {
+    const ret = tryRequestFullscreen(el);
+    if (!ret) continue;
     try {
-      const ret = req.call(root, { navigationUI: 'hide' });
-      if (ret && typeof ret.then === 'function') await ret;
+      if (typeof ret.then === 'function') await ret;
       apiOk = !!fsElement();
-    } catch (_) {
-      apiOk = false;
-    }
+      if (apiOk) break;
+    } catch (_) {}
   }
   if (!apiOk) {
-    root.classList.add('immersive');
+    document.documentElement.classList.add('immersive');
     if (isIpadLike()) {
       toast('Fullscreen mode on. For an app icon: Safari → Share → Add to Home Screen.', 'info', 4000);
     } else if (isLanHttp()) {
       toast('Fullscreen on. Chrome cannot install over HTTP — use this button, or an HTTPS tunnel to install.', 'info', 4000);
     }
   }
-  try {
-    if (screen.orientation && screen.orientation.lock) {
-      await screen.orientation.lock('landscape').catch(() => {});
-    }
-  } catch (_) {}
+  await maybeLockLandscape();
   updateFullscreenUi();
 }
 
@@ -4556,9 +4673,6 @@ async function exitDashboardFullscreen() {
     const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
     try { if (ex) await ex.call(document); } catch (_) {}
   }
-  try {
-    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
-  } catch (_) {}
   updateFullscreenUi();
 }
 
@@ -4592,7 +4706,14 @@ document.addEventListener('DOMContentLoaded', () => {
   startPolling();
   initKeyboardShortcuts();
   requestNotifPermission();
+  syncViewportHeight();
   updateFullscreenUi();
+  window.addEventListener('resize', syncViewportHeight);
+  window.addEventListener('orientationchange', syncViewportHeight);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncViewportHeight);
+    window.visualViewport.addEventListener('scroll', syncViewportHeight);
+  }
 
   document.getElementById('btn-fullscreen')?.addEventListener('click', (e) => {
     e.preventDefault();

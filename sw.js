@@ -1,5 +1,5 @@
 // Drop Scout – Service Worker (PWA offline shell)
-const CACHE_NAME = 'dropscout-v2';
+const CACHE_NAME = 'dropscout-v2.1';
 const SHELL_URLS = ['/', '/manifest.json'];
 
 // Install: cache the app shell
