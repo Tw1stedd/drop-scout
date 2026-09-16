@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Drop Scout">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0a0b0f">
+<meta name="theme-color" content="#07080c">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.svg">
@@ -42,11 +45,18 @@
 
   html, body {
     height: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-mono);
     font-size: 13px;
     overflow: hidden;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
   }
 
   /* ── Scrollbar ── */
@@ -59,7 +69,9 @@
     display: grid;
     grid-template-rows: 60px 1fr;
     grid-template-columns: 300px 1fr;
-    height: 100vh;
+    height: 100%;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
     gap: 0;
     background:
       radial-gradient(1200px 600px at 80% -10%, rgba(109,124,255,0.14), transparent 55%),
@@ -793,7 +805,9 @@
   .alert-img {
     width: 100px; height: 100px; object-fit: contain;
     border-radius: 8px; border: 1px solid var(--border2);
-    background: #0d0f1a; display: block;
+    background: #101218; display: block;
+    filter: brightness(0.92) contrast(0.94) saturate(0.96);
+    cursor: zoom-in;
   }
 
   /* Time */
@@ -1326,7 +1340,7 @@
     .dash-hero { padding: 18px 18px 6px; }
     .dash-scroll { padding: 8px 16px 24px; }
     .dash-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-    .drop-media { height: 190px; }
+    .drop-media { height: 200px; }
     .drop-title { font-size: 18px; }
 
     /* Log toolbar — stacked */
@@ -1716,17 +1730,19 @@
 
   .drop-media {
     position: relative;
-    height: 210px;
-    background:
-      radial-gradient(circle at 30% 20%, rgba(109,124,255,0.25), transparent 50%),
-      linear-gradient(160deg, #1a1f2e, #0b0d12);
+    height: 220px;
+    background: #101218;
     overflow: hidden;
     flex-shrink: 0;
   }
-  .drop-media img {
+  .drop-media img, .drop-photo {
     width: 100%; height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    object-position: center;
     display: block;
+    background: #101218;
+    filter: brightness(0.92) contrast(0.94) saturate(0.96);
+    cursor: zoom-in;
   }
   .drop-media .drop-fallback {
     width: 100%; height: 100%;
@@ -1818,6 +1834,105 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; gap: 10px; color: var(--muted); padding: 40px;
   }
+  .dash-hero-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .btn-fullscreen {
+    appearance: none;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #4f5dff);
+    color: #fff;
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-weight: 800;
+    min-height: 52px;
+    min-width: 168px;
+    padding: 0 22px;
+    border-radius: 16px;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 28px rgba(109,124,255,0.4);
+  }
+  .btn-fullscreen:hover, .btn-fullscreen.is-on {
+    border-color: transparent;
+    background: linear-gradient(135deg, #8b9bff, var(--accent));
+    color: #fff;
+    filter: brightness(1.04);
+  }
+  .dash-fs-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted);
+    max-width: 42ch;
+  }
+  .dash-fs-hint strong { color: var(--text); }
+  html.pwa-standalone .dash-fs-hint,
+  html.is-fullscreen .dash-fs-hint,
+  html.immersive .dash-fs-hint { display: none; }
+
+  #photo-lightbox {
+    display: none;
+    position: fixed; inset: 0; z-index: 500;
+    background: #07080c;
+    align-items: center; justify-content: center;
+    padding: 28px;
+    cursor: zoom-out;
+  }
+  #photo-lightbox.open { display: flex; }
+  #photo-lightbox img {
+    max-width: min(960px, 100%);
+    max-height: 100%;
+    width: auto; height: auto;
+    object-fit: contain;
+    background: #101218;
+    filter: brightness(0.92) contrast(0.94) saturate(0.96);
+    border-radius: 12px;
+  }
+  #photo-lightbox .lb-close {
+    position: absolute; top: 12px; right: 12px;
+    min-width: var(--tap); min-height: var(--tap);
+    border: none; border-radius: 12px;
+    background: rgba(255,255,255,0.08); color: #fff;
+    font-size: 22px; cursor: pointer;
+  }
+
+  @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+    html, body, #app {
+      height: 100%;
+      height: 100dvh;
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
+    }
+  }
+  html.pwa-standalone #app,
+  html.is-fullscreen #app,
+  html.immersive #app {
+    grid-template-columns: 1fr;
+  }
+  html.immersive #sidebar,
+  html.is-fullscreen #sidebar { display: none !important; }
+  html.immersive #mobile-bottom-nav,
+  html.is-fullscreen #mobile-bottom-nav { display: none !important; }
+  html.immersive #app,
+  html.is-fullscreen #app { padding-bottom: 0; grid-template-columns: 1fr; }
+  html.is-fullscreen .view-switch,
+  html.immersive .view-switch,
+  html.is-fullscreen .mobile-menu-btn,
+  html.immersive .mobile-menu-btn,
+  html.is-fullscreen .stat-chips,
+  html.immersive .stat-chips { display: none !important; }
+  html.is-fullscreen #header,
+  html.immersive #header { height: 48px; padding: 0 12px; }
+  html.is-fullscreen .dash-hero p,
+  html.immersive .dash-hero p { display: none; }
+  html.is-fullscreen .dash-hero,
+  html.immersive .dash-hero { padding: 10px 16px 6px; }
+  @media (orientation: landscape) {
+    html.is-fullscreen .drop-media,
+    html.immersive .drop-media { height: 160px; }
+    html.is-fullscreen .drop-card,
+    html.immersive .drop-card { min-height: 340px; }
+  }
+
   .dash-empty h2 {
     font-family: var(--font-ui); font-size: 32px; color: #fff; font-weight: 800;
   }
@@ -1852,9 +1967,9 @@
   .deal-card.profitable { border-left:3px solid var(--green); }
   .deal-card.unprofitable { border-left:3px solid var(--red); }
   .deal-card.unknown-profit { border-left:3px solid var(--muted); }
-  .deal-img-wrap { width:100%; height:180px; overflow:hidden; background:linear-gradient(180deg,rgba(10,11,15,.6),rgba(10,11,15,1)); display:flex; align-items:center; justify-content:center; position:relative; }
-  .deal-img { max-width:90%; max-height:170px; object-fit:contain; transition:transform .3s; }
-  .deal-card:hover .deal-img { transform:scale(1.05); }
+  .deal-img-wrap { width:100%; height:180px; overflow:hidden; background:#101218; display:flex; align-items:center; justify-content:center; position:relative; }
+  .deal-img { max-width:90%; max-height:170px; object-fit:contain; filter: brightness(0.92) contrast(0.94) saturate(0.96); cursor:zoom-in; }
+  .deal-card:hover .deal-img { transform:none; }
   .deal-no-img { font-size:48px; opacity:.15; color:var(--muted); }
   .deal-retailer-ribbon { position:absolute; top:10px; left:0; padding:3px 12px 3px 8px; font-size:10px; font-weight:800; letter-spacing:.3px; border-radius:0 4px 4px 0; text-transform:uppercase; }
   .deal-retailer-ribbon.rt-amazon  { background:rgba(255,153,0,.9); color:#1a1a1a; }
@@ -2382,8 +2497,12 @@
       <div>
         <h1>Live drops</h1>
         <p>Tablet wall — tap ATC, Deal, or Discord. Newest restocks stay on top.</p>
+        <p class="dash-fs-hint" id="dash-fs-hint"></p>
       </div>
-      <div class="dash-live" id="dash-live"><span class="pulse"></span><span id="dash-live-label">Monitor offline</span></div>
+      <div class="dash-hero-actions">
+        <button type="button" id="btn-fullscreen" class="btn-fullscreen" title="Fill the tablet screen">⛶ Fullscreen</button>
+        <div class="dash-live" id="dash-live"><span class="pulse"></span><span id="dash-live-label">Monitor offline</span></div>
+      </div>
     </div>
     <div class="dash-scroll">
       <div id="dash-grid" class="dash-grid"></div>
@@ -2442,7 +2561,11 @@
 
 </div>
 
-<!-- Sidebar overlay (mobile) -->
+<!-- Photo lightbox -->
+<div id="photo-lightbox" role="dialog" aria-modal="true" aria-label="Product photo">
+  <button type="button" class="lb-close" id="lb-close" aria-label="Close">×</button>
+  <img id="lb-img" alt="Product">
+</div>
 <div id="sidebar-overlay"></div>
 
 <!-- Mobile Bottom Navigation -->
@@ -2900,7 +3023,7 @@ function renderDashboard() {
     const timeLabel = drop.timestamp ? formatTimeAgo(new Date(drop.timestamp)) : (entry.time || '');
     const clock = drop.timestamp ? new Date(drop.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (entry.time || '');
     const media = drop.img
-      ? `<img src="${escHtml(drop.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=drop-fallback>📦</div>'">`
+      ? `<img class="drop-photo" src="${escHtml(drop.img)}" alt="" loading="lazy" data-full="${escHtml(drop.img)}" onerror="this.outerHTML='<div class=drop-fallback>📦</div>'">`
       : `<div class="drop-fallback">${retailerEmoji(drop)}</div>`;
     const atc = drop.atcUrl
       ? `<a class="drop-btn-atc" href="${escHtml(drop.atcUrl)}" target="_blank" rel="noopener">🛒 ATC</a>`
@@ -3083,7 +3206,7 @@ function renderLog(entry) {
     const isImgUrl = u => /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(u) || /walmartimages|media-amazon|images-bn|cdn\.discordapp|prodimage/i.test(u);
     const imgs = (d.image_urls||[]).filter(u => u && !/(gif|svg)$/i.test(u)).slice(0,3);
     const imgHTML = imgs.length
-      ? `<div class="alert-images">${imgs.map(u=>`<a href="${escHtml(u)}" target="_blank" rel="noopener"><img class="alert-img" src="${escHtml(u)}" alt="product" loading="lazy"></a>`).join('')}</div>`
+      ? `<div class="alert-images">${imgs.map(u=>`<img class="alert-img" src="${escHtml(u)}" alt="product" loading="lazy" data-full="${escHtml(u)}">`).join('')}</div>`
       : '';
 
     // ── Action buttons ────────────────────────────────────────────────────
@@ -4143,7 +4266,7 @@ function renderDeals() {
 
     // Image
     const imgHtml = deal.img
-      ? `<img class="deal-img" src="${escHtml(deal.img)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=deal-no-img>📦</div>'">`
+      ? `<img class="deal-img" src="${escHtml(deal.img)}" alt="" loading="lazy" data-full="${escHtml(deal.img)}" onerror="this.parentElement.innerHTML='<div class=deal-no-img>📦</div>'">`
       : '<div class="deal-no-img">📦</div>';
 
     // Retailer ribbon
@@ -4271,12 +4394,170 @@ async function saveConfig() {
   }
 }
 
+function isStandaloneDisplay() {
+  return !!(window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || window.matchMedia('(display-mode: minimal-ui)').matches
+    || window.navigator.standalone);
+}
+
+function isLanHttp() {
+  const h = location.hostname;
+  const local = h === 'localhost' || h === '127.0.0.1' || h === '::1';
+  return location.protocol === 'http:' && !local;
+}
+
+function isIpadLike() {
+  const ua = navigator.userAgent || '';
+  return /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent || '');
+}
+
+function fsElement() {
+  return document.fullscreenElement
+    || document.webkitFullscreenElement
+    || document.msFullscreenElement
+    || null;
+}
+
+function updateFullscreenUi() {
+  const on = !!(fsElement() || document.documentElement.classList.contains('immersive'));
+  const standalone = isStandaloneDisplay();
+  document.documentElement.classList.toggle('is-fullscreen', !!fsElement());
+  document.documentElement.classList.toggle('pwa-standalone', standalone);
+  const btn = document.getElementById('btn-fullscreen');
+  if (btn) {
+    btn.classList.toggle('is-on', on || standalone);
+    if (standalone && !on) btn.textContent = 'Home screen';
+    else btn.textContent = on ? '✕ Exit Fullscreen' : '⛶ Fullscreen';
+  }
+  const hint = document.getElementById('dash-fs-hint');
+  if (hint) {
+    if (standalone) {
+      hint.innerHTML = '';
+    } else if (isIpadLike()) {
+      hint.innerHTML = 'iPad: tap <strong>Fullscreen</strong> in this page. Chrome cannot install a LAN HTTP site as an app — for a home-screen icon use <strong>Safari → Share → Add to Home Screen</strong>.';
+    } else if (isLanHttp()) {
+      hint.innerHTML = 'This is <strong>http://LAN</strong>, so Chrome will only add a shortcut, not install an app. Tap <strong>Fullscreen</strong> to fill the tablet. A real install needs an <strong>HTTPS tunnel</strong>.';
+    } else {
+      hint.innerHTML = 'Tap <strong>Fullscreen</strong> to hide browser chrome and fill the tablet.';
+    }
+  }
+}
+
+async function enterDashboardFullscreen() {
+  if (isStandaloneDisplay()) {
+    document.documentElement.classList.add('immersive');
+    updateFullscreenUi();
+    toast('Already in home-screen mode', 'info', 1800);
+    return;
+  }
+  const root = document.documentElement;
+  const req = root.requestFullscreen || root.webkitRequestFullscreen || root.webkitRequestFullScreen || root.msRequestFullscreen;
+  let apiOk = false;
+  if (typeof req === 'function') {
+    try {
+      const ret = req.call(root, { navigationUI: 'hide' });
+      if (ret && typeof ret.then === 'function') await ret;
+      apiOk = !!fsElement();
+    } catch (_) {
+      apiOk = false;
+    }
+  }
+  if (!apiOk) {
+    root.classList.add('immersive');
+    if (isIpadLike()) {
+      toast('Fullscreen mode on. For an app icon: Safari → Share → Add to Home Screen.', 'info', 4000);
+    } else if (isLanHttp()) {
+      toast('Fullscreen on. Chrome cannot install over HTTP — use this button, or an HTTPS tunnel to install.', 'info', 4000);
+    }
+  }
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      await screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch (_) {}
+  updateFullscreenUi();
+}
+
+async function exitDashboardFullscreen() {
+  document.documentElement.classList.remove('immersive');
+  const cur = fsElement();
+  if (cur) {
+    const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    try { if (ex) await ex.call(document); } catch (_) {}
+  }
+  try {
+    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+  } catch (_) {}
+  updateFullscreenUi();
+}
+
+async function toggleDashboardFullscreen() {
+  if (fsElement() || document.documentElement.classList.contains('immersive')) {
+    await exitDashboardFullscreen();
+  } else {
+    await enterDashboardFullscreen();
+  }
+}
+
+function openPhotoLightbox(url) {
+  if (!url) return;
+  const box = document.getElementById('photo-lightbox');
+  const img = document.getElementById('lb-img');
+  if (!box || !img) return;
+  img.src = url;
+  box.classList.add('open');
+}
+
+function closePhotoLightbox() {
+  const box = document.getElementById('photo-lightbox');
+  const img = document.getElementById('lb-img');
+  if (box) box.classList.remove('open');
+  if (img) img.removeAttribute('src');
+}
+
 // ── Event listeners ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadAll();
   startPolling();
   initKeyboardShortcuts();
   requestNotifPermission();
+  updateFullscreenUi();
+
+  document.getElementById('btn-fullscreen')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleDashboardFullscreen();
+  });
+  ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach((ev) => {
+    document.addEventListener(ev, updateFullscreenUi);
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#lb-close') || e.target.id === 'photo-lightbox') {
+      closePhotoLightbox();
+      return;
+    }
+    const img = e.target.closest('img[data-full]');
+    if (img && img.dataset.full && !e.target.closest('a')) {
+      e.preventDefault();
+      e.stopPropagation();
+      openPhotoLightbox(img.dataset.full);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('photo-lightbox')?.classList.contains('open')) {
+      closePhotoLightbox();
+      e.preventDefault();
+      return;
+    }
+    if (fsElement() || document.documentElement.classList.contains('immersive')) {
+      exitDashboardFullscreen();
+    }
+  });
 
   // ── Mobile: Sidebar drawer open/close ──
   function openMobileSidebar() {

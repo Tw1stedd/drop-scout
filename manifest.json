@@ -1,12 +1,13 @@
 {
-  "name": "Drop Scout",
+  "name": "Drop Scout 2.0",
   "short_name": "Drop Scout",
   "description": "Discord product drop monitor for resellers",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#0a0b0f",
-  "theme_color": "#0a0b0f",
+  "background_color": "#07080c",
+  "theme_color": "#07080c",
   "categories": ["utilities", "shopping"],
   "icons": [
     {
