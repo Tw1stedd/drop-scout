@@ -9,7 +9,7 @@
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.svg">
-<title>Drop Scout</title>
+<title>Drop Scout 2.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -125,6 +125,17 @@
     letter-spacing: -0.3px;
     color: #fff;
     flex-shrink: 0;
+  }
+  .logo-ver {
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #fff;
+    background: rgba(109,124,255,0.28);
+    border: 1px solid rgba(109,124,255,0.45);
   }
 
   .logo-icon {
@@ -1924,7 +1935,7 @@
           <circle cx="15" cy="25" r="1.5" fill="#3ba55c" opacity="0.9"/>
         </svg>
       </div>
-      Drop Scout
+      Drop Scout <span class="logo-ver">2.0</span>
     </div>
 
     <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open settings">☰</button>
@@ -3436,7 +3447,7 @@ function updateAlertCount(n) {
   document.getElementById('h-alerts').textContent = n;
 
   // Tab title badge
-  document.title = n > 0 ? `(${n}) Drop Scout` : 'Drop Scout';
+  document.title = n > 0 ? `(${n}) Drop Scout 2.0` : 'Drop Scout 2.0';
 
   if (isNew) {
     // Flash the alerts chip

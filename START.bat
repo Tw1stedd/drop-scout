@@ -1,8 +1,10 @@
 @echo off
-title Discord Monitor
+title Drop Scout 2.0
+cd /d "%~dp0"
+
 echo.
 echo  ======================================
-echo    Discord Monitor - Starting...
+echo    Drop Scout 2.0  —  Dashboard
 echo  ======================================
 echo.
 
@@ -33,8 +35,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Pr
 :: Also kill any running DropScout.exe (compiled version) to free port 7890
 taskkill /F /IM DropScout.exe >nul 2>&1
 
-echo  Starting Discord Monitor...
-echo  Your browser will open automatically.
+echo  Starting Drop Scout 2.0 ^(dashboard UI^)...
+echo  Browser: http://localhost:7890
 echo  Press Ctrl+C in this window to stop.
 echo.
 

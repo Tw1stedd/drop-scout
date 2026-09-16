@@ -2230,7 +2230,7 @@ PORT = 7890
 
 def main():
     print("=" * 55)
-    print("  Drop Scout — Starting...")
+    print("  Drop Scout 2.0 — Dashboard")
     print(f"  UI: http://localhost:{PORT}")
     print("  Press Ctrl+C to stop.")
     print("=" * 55)
@@ -2279,7 +2279,7 @@ def main():
     def open_browser():
         time.sleep(0.8)
         # Cache-bust on launch so users don't need Ctrl+F5 to get latest UI logic.
-        webbrowser.open(f"http://localhost:{PORT}/?v={int(time.time())}")
+        webbrowser.open(f"http://localhost:{PORT}/?v=2.0.{int(time.time())}")
     threading.Thread(target=open_browser, daemon=True).start()
 
     add_log("success", f"✅ Server started on http://localhost:{PORT}")
