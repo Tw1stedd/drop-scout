@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 echo ""
 echo "  ======================================"
-echo "    Drop Scout 2.0  —  Dashboard"
+echo "    Drop Scout 2.0 - Dashboard"
 echo "  ======================================"
 echo ""
 

@@ -1,45 +1,88 @@
 @echo off
+setlocal EnableExtensions
 title Drop Scout 2.0
 cd /d "%~dp0"
 
-echo.
-echo  ======================================
-echo    Drop Scout 2.0  —  Dashboard
-echo  ======================================
-echo.
+REM Optional UTF-8 console (banners below stay ASCII so OEM code pages don't mojibake)
+chcp 65001 >nul 2>&1
 
-:: Check Python
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo  ERROR: Python not found.
-    echo  Download from: https://www.python.org/downloads/
+echo.
+echo  ======================================
+echo    Drop Scout 2.0 - Dashboard
+echo  ======================================
+echo.
+echo  Finding Python...
+
+REM Prefer the py launcher (real install). Never invoke the Windows Store python stub
+REM (%LocalAppData%\Microsoft\WindowsApps\python.exe) -- it can hang with no output.
+set "PY="
+set "PYX="
+where py >nul 2>&1
+if not errorlevel 1 (
+    for /f "delims=" %%I in ('where py 2^>nul') do (
+        echo %%I | findstr /I /C:"WindowsApps" >nul
+        if errorlevel 1 (
+            "%%I" -3 -c "import sys" >nul 2>&1
+            if not errorlevel 1 (
+                set "PY=%%I"
+                set "PYX=-3"
+                goto :py_ok
+            )
+        )
+    )
+)
+
+if not defined PY (
+    for /f "delims=" %%I in ('where python 2^>nul') do (
+        echo %%I | findstr /I /C:"WindowsApps" >nul
+        if errorlevel 1 (
+            "%%I" -c "import sys" >nul 2>&1
+            if not errorlevel 1 (
+                set "PY=%%I"
+                set "PYX="
+                goto :py_ok
+            )
+        )
+    )
+)
+
+:py_ok
+if not defined PY (
+    echo  ERROR: Python not found ^(Windows Store stub ignored^).
+    echo  Install from https://www.python.org/downloads/ and tick "Add python.exe to PATH".
+    echo  Or install the "py" launcher and retry.
     pause
     exit /b 1
 )
 
-:: Install discord.py-self if missing
-python -c "import discord" >nul 2>&1
+echo  Using: "%PY%" %PYX%
+
+REM discord.py-self if missing (do not use bare "python" - Store stub)
+"%PY%" %PYX% -c "import discord" >nul 2>&1
 if errorlevel 1 (
-    echo  Installing discord.py-self... ^(first run only^)
-    pip install discord.py-self
+    echo  Installing discord.py-self... (first run only)
+    "%PY%" %PYX% -m pip install discord.py-self
     if errorlevel 1 (
         echo.
-        echo  Install failed. Try running: pip install discord.py-self
+        echo  Install failed. Try: "%PY%" %PYX% -m pip install discord.py-self
         pause
         exit /b 1
     )
 )
 
-:: Kill old server processes so launch always starts clean/offline
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*discord_monitor_server.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
-:: Also kill any running DropScout.exe (compiled version) to free port 7890
+REM Free port 7890 without PowerShell Get-CimInstance (that WMI query hangs on many PCs).
+echo  Checking for an old instance...
 taskkill /F /IM DropScout.exe >nul 2>&1
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":7890.*LISTENING"') do (
+    if not "%%P"=="0" taskkill /F /PID %%P >nul 2>&1
+)
 
-echo  Starting Drop Scout 2.0 ^(dashboard UI^)...
+echo  Starting Drop Scout 2.0 (dashboard UI)...
 echo  Browser: http://localhost:7890
 echo  Press Ctrl+C in this window to stop.
 echo.
 
-python discord_monitor_server.py
+"%PY%" %PYX% discord_monitor_server.py
 
 pause
+endlocal

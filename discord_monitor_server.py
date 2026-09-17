@@ -2515,7 +2515,7 @@ PORT = 7890
 
 def main():
     print("=" * 55)
-    print("  Drop Scout 2.0 — Dashboard")
+    print("  Drop Scout 2.0 - Dashboard")
     print(f"  UI: http://localhost:{PORT}")
     print("  Press Ctrl+C to stop.")
     print("=" * 55)
