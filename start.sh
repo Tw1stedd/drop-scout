@@ -26,8 +26,8 @@ if [ $? -ne 0 ]; then
     fi
 fi
 
-# Kill old server process so launch always starts clean/offline
-pkill -f "discord_monitor_server.py" >/dev/null 2>&1 || true
+# Do not pkill here — a stuck process table wait must never block launch.
+# discord_monitor_server.py exits immediately if port 7890 is already bound.
 
 echo "  Starting Drop Scout 2.0 (dashboard UI)..."
 echo "  Browser: http://localhost:7890"

@@ -70,12 +70,9 @@ if errorlevel 1 (
     )
 )
 
-REM Free port 7890 without PowerShell Get-CimInstance (that WMI query hangs on many PCs).
-echo  Checking for an old instance...
-taskkill /F /IM DropScout.exe >nul 2>&1
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":7890.*LISTENING"') do (
-    if not "%%P"=="0" taskkill /F /PID %%P >nul 2>&1
-)
+REM Do not kill old processes here. taskkill and netstat -ano can hang forever
+REM on some PCs (same class of stall as Get-CimInstance). The server exits
+REM immediately if 7890 is already bound.
 
 echo  Starting Drop Scout 2.0 (dashboard UI)...
 echo  Browser: http://localhost:7890

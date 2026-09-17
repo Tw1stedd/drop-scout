@@ -2553,10 +2553,7 @@ def main():
     try:
         server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     except OSError as e:
-        print(f"\n  ❌ ERROR: Port {PORT} is already in use!")
-        print(f"     Another instance of Drop Scout (or DropScout.exe) may be running.")
-        print(f"     Close it first, or run:  taskkill /F /IM DropScout.exe")
-        input("\n  Press Enter to exit...")
+        print(f"ERROR: port {PORT} already in use. Close the other Drop Scout window and retry. ({e})")
         sys.exit(1)
     server.timeout = 1
 
