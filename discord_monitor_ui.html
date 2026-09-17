@@ -2686,6 +2686,7 @@ const S = {
   manualStarted: false,
   lastTopId: 0,
   lastWallId: 0,
+  lastAlertAt: '',
   lastPollOk: 0,
   soundEnabled: true,
   notifsEnabled: true,
@@ -2967,6 +2968,9 @@ function parseStructuredContent(raw) {
       if (textOnly && !/^<@/.test(line)) result.bodyLines.push(textOnly);
     }
     result.title = heading || result.bodyLines.shift() || '';
+    if (isAlertChromeTitle(result.title) && result.bodyLines.length) {
+      result.title = result.bodyLines.shift();
+    }
     return result;
   }
 
@@ -2974,7 +2978,7 @@ function parseStructuredContent(raw) {
   // First non-key, non-mention line is the title
   while (i < lines.length) {
     const candidate = stripDiscordMentions(lines[i]);
-    if (candidate && !knownKeys.has(candidate.toLowerCase())) {
+    if (candidate && !knownKeys.has(candidate.toLowerCase()) && !isAlertChromeTitle(candidate)) {
       result.title = candidate;
       i++;
       break;
@@ -3061,17 +3065,65 @@ function pickDealUrl(parsed, details) {
   return fromBackend || '';
 }
 
-const _EBAY_JUNK = /^(new|drop|live|restock|in|stock|alert|deal|now|today|limited|wow|everyone|here|update|posted)$/i;
+const _EBAY_JUNK = /^(new|drop|live|restock|in|stock|alert|deal|now|today|limited|wow|everyone|here|update|posted|match|channel|discord|monitor|keyword|keywords|post|message)$/i;
+
+function isAlertChromeTitle(s) {
+  let t = String(s || '')
+    .replace(/[\u{1F300}-\u{1FAFF}🚨🔔📬]/gu, ' ')
+    .replace(/[#*_`|>]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!t) return true;
+  if (/^(restock|drop|deal|live|stock)\s+alerts?$/.test(t)) return true;
+  if (/^match\s+in\s+#?\S*$/.test(t)) return true;
+  if (/^new\s+post(\s+in\s+#?\S*)?$/.test(t)) return true;
+  const words = t.split(/\s+/).filter(w => w.length > 1 && !_EBAY_JUNK.test(w));
+  return words.length === 0;
+}
+
+function stripAlertChrome(s) {
+  return String(s || '')
+    .replace(/^[\s\u{1F300}-\u{1FAFF}🚨🔔📬]+/u, '')
+    .replace(/^(?:restock|drop|deal|live|stock)\s+alerts?\s*[:\-–]?\s*/i, '')
+    .replace(/^match\s+in\s+#?\S+\s*[:\-–]?\s*/i, '')
+    .replace(/^new\s+post\s+in\s+#?\S+\s*[:\-–]?\s*/i, '')
+    .trim();
+}
+
+function productTitleFromAlert(details, parsed) {
+  const d = details || {};
+  if (d.product_title && !isAlertChromeTitle(d.product_title)) {
+    return String(d.product_title).trim().slice(0, 150);
+  }
+  const candidates = [];
+  if (parsed && parsed.title) candidates.push(parsed.title);
+  if (parsed && parsed.bodyLines) candidates.push(...parsed.bodyLines);
+  for (const line of String(d.content || '').split('\n')) candidates.push(line);
+  const skipKey = /^(sku|price|seller|offer id|add to cart|links|type|order limit|recommended price)$/i;
+  for (const c of candidates) {
+    let t = stripDiscordMentions(String(c || '')).replace(/^#+\s*/, '');
+    t = stripAlertChrome(t)
+      .replace(/https?:\/\/\S+/gi, ' ')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (t && t.length >= 4 && !skipKey.test(t) && !isAlertChromeTitle(t)) return t.slice(0, 150);
+  }
+  return '';
+}
 
 function buildEbaySoldQuery(item) {
   const it = item || {};
-  let title = String(it.title || '');
+  let title = productTitleFromAlert(
+    { product_title: it.productTitle, content: it.content || '' },
+    { title: it.title, bodyLines: it.bodyLines || [] }
+  ) || String(it.title || '');
   title = stripDiscordMentions(title)
     .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[#*_`|>]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/[#*_`|>]+/g, ' ');
+  title = stripAlertChrome(title).replace(/\s+/g, ' ').trim();
   const tokens = title.split(/\s+/).filter(t => t.length > 1 && !_EBAY_JUNK.test(t));
   const asin = String(it.asin || '').trim();
   const sku = String(it.sku || '').trim();
@@ -3079,13 +3131,14 @@ function buildEbaySoldQuery(item) {
   const ident = (asin.length === 10 ? asin : '') || (skuIsAsin ? sku : '');
   const extraSku = sku && !skuIsAsin && sku.length >= 6 ? sku : '';
   let query = '';
-  if (tokens.length >= 2) query = title;
+  if (tokens.length >= 2) query = tokens.join(' ');
   else if (tokens.length === 1 && tokens[0].length >= 4) {
     query = ident ? `${tokens[0]} ${ident}` : (extraSku ? `${tokens[0]} ${extraSku}` : tokens[0]);
   } else if (ident) query = ident;
   else if (extraSku) query = extraSku;
-  else query = title;
+  else query = isAlertChromeTitle(title) ? '' : title;
   query = query.replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (isAlertChromeTitle(query)) query = ident || extraSku || '';
   const soldUrl = query
     ? `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=12`
     : 'https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1';
@@ -3095,8 +3148,7 @@ function buildEbaySoldQuery(item) {
 function extractDropCard(entry) {
   const d = entry.details || {};
   const p = parseStructuredContent(d.content || '');
-  const rawTitle = (p && p.title) || (d.content || '').split('\n')[0].replace(/^#+\s*/, '') || '(no content)';
-  const title = stripDiscordMentions(rawTitle).replace(/^#+\s*/, '') || '(no content)';
+  const title = productTitleFromAlert(d, p) || '(no content)';
   const atcUrl = (p && p.atcUrl) || '';
   const dealUrl = pickDealUrl(p, d);
   const img = (d.image_urls || []).find(u => u && !/\.(gif|svg)(\?|$)/i.test(u)) || '';
@@ -3116,6 +3168,9 @@ function extractDropCard(entry) {
     retailer,
     asin: d.asin || (p && p.sku && /^B0[A-Z0-9]{8}$/.test(p.sku) ? p.sku : '') || '',
     sku: (p && p.sku) || '',
+    content: d.content || '',
+    productTitle: d.product_title || '',
+    bodyLines: (p && p.bodyLines) || [],
   };
 }
 
@@ -3129,7 +3184,10 @@ function retailerEmoji(drop) {
 
 function liveDropAlerts(source, cap) {
   cap = cap || 24;
-  const alerts = (source || []).filter(l => l && l.level === 'alert' && l.details);
+  const alerts = (source || [])
+    .filter(l => l && l.level === 'alert' && l.details)
+    .slice()
+    .sort((a, b) => (b.id || 0) - (a.id || 0));
   const featured = [];
   const extra = [];
   const seen = new Set();
@@ -3282,7 +3340,7 @@ function renderLog(entry) {
     const authorPill = d.author ? `<span class="meta-pill author">👤 ${escHtml(d.author)}</span>` : '';
 
     // ── Title ──────────────────────────────────────────────────────────────
-    const rawTitle = (p && p.title) || (d.content||'').split('\n')[0].replace(/^#+\s*/,'') || '(no content)';
+    const rawTitle = productTitleFromAlert(d, p) || (p && p.title) || (d.content||'').split('\n')[0].replace(/^#+\s*/,'') || '(no content)';
     const title = stripDiscordMentions(rawTitle).replace(/^#+\s*/,'') || '(no content)';
 
     // ── Retailer badge ─────────────────────────────────────────────────────
@@ -3397,7 +3455,7 @@ function renderLog(entry) {
       : '';
 
     // ── Auto search buttons from title ──────────────────────────────────────
-    const searchQ = buildEbaySoldQuery({ title, asin: d.asin || (p && p.sku) || '', sku: (p && p.sku) || '' });
+    const searchQ = buildEbaySoldQuery({ title, asin: d.asin || (p && p.sku) || '', sku: (p && p.sku) || '', content: d.content || '', productTitle: d.product_title || '', bodyLines: (p && p.bodyLines) || [] });
     const searchEnc = encodeURIComponent((searchQ.query || title || '').substring(0, 120).trim());
     const searchBtns = searchEnc ? `
       <a class="qlink qlink-ebay" href="${escHtml(searchQ.soldUrl)}" target="_blank" rel="noopener" title="${escHtml(searchQ.query)}">🔍 eBay Sold</a>
@@ -3557,11 +3615,14 @@ async function pollOnce() {
     const wallTop = wall.length ? wall[0].id : 0;
     const newCount = typeof logData.alert_count === 'number' ? logData.alert_count : (statusData.alert_count || 0);
 
-    if (newTopId !== S.lastTopId || newCount !== S.alertCount || wallTop !== S.lastWallId) {
+    const lastAlertAt = statusData.last_alert_at || '';
+    if (newTopId !== S.lastTopId || newCount !== S.alertCount || wallTop !== S.lastWallId
+        || lastAlertAt !== S.lastAlertAt || wall.length !== (S.liveAlerts || []).length) {
       S.logs = logs;
       S.liveAlerts = wall;
       S.lastTopId = newTopId;
       S.lastWallId = wallTop;
+      S.lastAlertAt = lastAlertAt;
       updateAlertCount(newCount);
       // Rebuild only the visible surface so the alert path stays cheap.
       if (S.activeView === 'dashboard') renderDashboard();
@@ -4241,7 +4302,7 @@ function processAlertsIntoDeals(alerts) {
   for (const alert of alerts) {
     const d = alert.details || {};
     const p = parseStructuredContent(d.content || '');
-    const rawTitle = (p && p.title) ? stripDiscordMentions(p.title).replace(/^#+\s*/,'') : '';
+    const rawTitle = productTitleFromAlert(d, p) || ((p && p.title) ? stripDiscordMentions(p.title).replace(/^#+\s*/,'') : '');
     const title = rawTitle.substring(0, 150).trim();
     if (!title || title === '(no content)') continue;
 
@@ -4350,6 +4411,7 @@ async function ebayLookup(deal, forceRefresh = false, openOnFail = false) {
       title: deal.title || '',
       asin: deal.asin || '',
       sku: deal.sku || '',
+      content: deal.content || '',
     });
     const packed = Object.assign({ count: 0, prices: [], query: built.query, search_url: built.soldUrl }, data || {});
     if (!packed.search_url) packed.search_url = built.soldUrl;

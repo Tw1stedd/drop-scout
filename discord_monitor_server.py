@@ -330,12 +330,13 @@ def _history_flush_loop():
 def add_log(level: str, message: str, details: dict = None):
     """Add a log entry to shared state."""
     entry = {
-        "id": int(time.time() * 1000),
+        "id": state.get("_log_seq", 0) + 1,
         "time": datetime.now().strftime("%H:%M:%S"),
         "level": level,  # info | success | warning | error | alert
         "message": message,
         "details": details or {}
     }
+    state["_log_seq"] = entry["id"]
     state["logs"].insert(0, entry)
     # Keep last 200 logs
     if len(state["logs"]) > 200:
@@ -524,8 +525,69 @@ _ebay_browser_available = None  # None = untested, True/False after first attemp
 
 _EBAY_JUNK_TITLE = {
     "new", "drop", "live", "restock", "in", "stock", "alert", "deal", "now",
-    "today", "limited", "wow", "everyone", "here", "update", "posted",
+    "today", "limited", "wow", "everyone", "here", "update", "posted", "match",
+    "channel", "discord", "monitor", "keyword", "keywords", "post", "message",
 }
+
+_EBAY_CHROME_LINE = _re.compile(
+    r"^(?:"
+    r"(?:restock|drop|deal|live|stock)\s+alerts?"
+    r"|match\s+in\s+#?\S+"
+    r"|new\s+post\s+in\s+#?\S+"
+    r"|new\s+post"
+    r")$",
+    _re.I,
+)
+
+_EBAY_CHROME_PREFIX = _re.compile(
+    r"^(?:[\U0001F300-\U0001FAFF🚨🔔📬⚠✅❌◦]\s*)+"
+    r"|(?:restock|drop|deal|live|stock)\s+alerts?\s*[:\-–]?\s*"
+    r"|match\s+in\s+#?\S+\s*[:\-–]?\s*"
+    r"|new\s+post\s+in\s+#?\S+\s*[:\-–]?\s*",
+    _re.I,
+)
+
+
+def _is_ebay_chrome_title(text: str) -> bool:
+    t = (text or "").strip()
+    t = _re.sub(r"[\U0001F300-\U0001FAFF🚨🔔📬]", " ", t)
+    t = _re.sub(r"[#*_`|>]+", " ", t)
+    t = _re.sub(r"\s+", " ", t).strip().lower()
+    if not t:
+        return True
+    if _EBAY_CHROME_LINE.match(t):
+        return True
+    words = [w for w in t.split() if w not in _EBAY_JUNK_TITLE and len(w) > 1]
+    return len(words) == 0
+
+
+def _product_title_from_content(content: str) -> str:
+    """First real product line — never Discord/monitor chrome."""
+    skip_starts = (
+        "http", "<@", "```", "sku", "price", "offer", "seller", "order",
+        "add to", "links", "cart", "type", "asin", "quantity", "condition",
+    )
+    for line in (content or "").split("\n"):
+        clean = line.strip().lstrip("#").strip()
+        clean = _re.sub(r"<@!?&?\d+>", " ", clean)
+        clean = _re.sub(r"https?://\S+", " ", clean)
+        clean = _re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", clean)
+        for _ in range(3):
+            nxt = _EBAY_CHROME_PREFIX.sub("", clean).strip(" -–:|")
+            if nxt == clean:
+                break
+            clean = nxt
+        clean = _re.sub(r"\s+", " ", clean).strip(" -–:|")
+        if not clean:
+            continue
+        low = clean.lower()
+        if any(low.startswith(s) for s in skip_starts):
+            continue
+        if _is_ebay_chrome_title(clean):
+            continue
+        if len(clean) >= 4:
+            return clean[:120]
+    return ""
 
 
 def _ebay_search_url(query: str) -> str:
@@ -534,23 +596,29 @@ def _ebay_search_url(query: str) -> str:
             "&LH_Complete=1&LH_Sold=1&_ipg=60&_sop=12")
 
 
-def _clean_ebay_query(title: str = "", asin: str = "", sku: str = "") -> str:
+def _clean_ebay_query(title: str = "", asin: str = "", sku: str = "", content: str = "") -> str:
     """Build an eBay sold-search string from product title + identifiers."""
     import re as _re_clean
     raw = (title or "").strip()
     raw = _re_clean.sub(r"https?://\S+", " ", raw)
     raw = _re_clean.sub(r"<@!?&?\d+>", " ", raw)
     raw = _re_clean.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
+    raw = _EBAY_CHROME_PREFIX.sub("", raw)
     raw = _re_clean.sub(r"[#*_`|>]+", " ", raw)
-    raw = _re_clean.sub(r"\s+", " ", raw).strip()
+    raw = _re_clean.sub(r"\s+", " ", raw).strip(" -–:")
+    if _is_ebay_chrome_title(raw) and content:
+        raw = _product_title_from_content(content) or raw
     tokens = [t for t in raw.split(" ") if len(t) > 1 and t.lower() not in _EBAY_JUNK_TITLE]
     asin = (asin or "").strip().upper()
     sku = (sku or "").strip()
     sku_is_asin = bool(_re_clean.match(r"^B0[A-Z0-9]{8}$", sku, _re_clean.I))
     ident = asin if len(asin) == 10 else (sku if sku_is_asin else "")
     extra_sku = sku if sku and not sku_is_asin and len(sku) >= 6 else ""
+    if _is_ebay_chrome_title(" ".join(tokens)):
+        tokens = []
     if len(tokens) >= 2:
-        return raw[:120]
+        q = " ".join(tokens)[:120]
+        return q
     if len(tokens) == 1 and len(tokens[0]) >= 4:
         base = tokens[0]
         if ident:
@@ -562,7 +630,11 @@ def _clean_ebay_query(title: str = "", asin: str = "", sku: str = "") -> str:
         return ident
     if extra_sku:
         return extra_sku
-    return raw[:120]
+    if content:
+        fallback = _product_title_from_content(content)
+        if fallback and not _is_ebay_chrome_title(fallback):
+            return fallback[:120]
+    return ""
 
 
 def _ebay_empty_result(query: str, error: str = "", blocked: bool = False) -> dict:
@@ -1572,6 +1644,8 @@ def run_monitor(config: dict, stop_event: threading.Event):
             prefix = "🚨" if alert_priority == "high" else "🔔"
             log_msg = f"{prefix} Match in #{channel_name}"
 
+        product_title = _product_title_from_content(msg_text)
+
         add_log("alert", log_msg, {
             "server": guild_name,
             "channel": channel_name,
@@ -1579,6 +1653,7 @@ def run_monitor(config: dict, stop_event: threading.Event):
             "keywords": fresh if fresh else ["[monitor all]"],
             "content": msg_text[:3000],
             "raw_content": raw_content[:800],
+            "product_title": product_title,
             "jump_url": jump_url,
             "timestamp": datetime.now().isoformat(),
             "monitor_mode": "all" if is_monitor_all else "keywords",
@@ -2046,10 +2121,11 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/ebay-lookup":
             try:
                 data = json.loads(self.read_body())
-                title = (data.get("query") or data.get("title") or "").strip()
+                title = (data.get("title") or data.get("query") or "").strip()
                 asin = (data.get("asin") or "").strip()
                 sku = (data.get("sku") or "").strip()
-                query = _clean_ebay_query(title, asin=asin, sku=sku)
+                content = (data.get("content") or "").strip()
+                query = _clean_ebay_query(title, asin=asin, sku=sku, content=content)
                 if not query:
                     self.send_json({
                         "error": "No product title, ASIN, or SKU to search on eBay",
@@ -2279,6 +2355,7 @@ class Handler(BaseHTTPRequestHandler):
                             "links": ["https://www.amazon.com/dp/B0DH1ZW4MM"],
                             "priority": "high",
                             "asin": "B0DH1ZW4MM",
+                            "product_title": "Pokemon TCG Prismatic Evolutions Elite Trainer Box",
                         },
                     },
                     {
@@ -2289,7 +2366,8 @@ class Handler(BaseHTTPRequestHandler):
                             "author": "DropPing",
                             "keywords": ["hot wheels"],
                             "content": (
-                                "# Hot Wheels Premium Boulevard Mix\n"
+                                "# Restock Alert\n"
+                                "Hot Wheels Premium Boulevard Mix\n"
                                 "Just hit Target online — limited per household.\n"
                                 "[ATC](https://www.target.com/p/hot-wheels/-/A-12345678)\n"
                                 "https://www.target.com/p/hot-wheels/-/A-12345678"
@@ -2347,7 +2425,9 @@ class Handler(BaseHTTPRequestHandler):
                 ]
                 last = None
                 for s in samples:
-                    last = add_log("alert", s["message"], s["details"])
+                    d = s["details"]
+                    d["product_title"] = d.get("product_title") or _product_title_from_content(d.get("content") or "")
+                    last = add_log("alert", s["message"], d)
                     state["alert_count"] += 1
                     state["last_alert_at"] = datetime.now().isoformat()
                 self.send_json({"ok": True, "count": len(samples), "alert": last})
