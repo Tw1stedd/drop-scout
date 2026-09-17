@@ -2,14 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Drop Scout">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0a0b0f">
+<meta name="theme-color" content="#07080c">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.svg">
-<title>Drop Scout</title>
+<title>Drop Scout 2.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -17,36 +20,47 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:       #0a0b0f;
-    --surface:  #0f1117;
-    --panel:    #13161e;
-    --border:   #1e2330;
-    --border2:  #252b3b;
-    --text:     #c8d0e8;
-    --muted:    #4a5270;
-    --accent:   #5865f2;
-    --accent2:  #7289da;
-    --green:    #3ba55c;
-    --yellow:   #faa61a;
-    --red:      #ed4245;
-    --cyan:     #00b0f4;
-    --purple:   #9b59b6;
-    --glow:     rgba(88,101,242,0.15);
-    --glow2:    rgba(88,101,242,0.06);
+    --bg:       #07080c;
+    --surface:  #0c0e14;
+    --panel:    #12151e;
+    --border:   #1c2230;
+    --border2:  #2a3144;
+    --text:     #e4e9f7;
+    --muted:    #7a84a3;
+    --accent:   #6d7cff;
+    --accent2:  #8b9bff;
+    --green:    #3dd68c;
+    --yellow:   #ffc14a;
+    --red:      #ff5d62;
+    --cyan:     #4ecbff;
+    --purple:   #c084fc;
+    --glow:     rgba(109,124,255,0.22);
+    --glow2:    rgba(109,124,255,0.08);
     --font-mono: 'JetBrains Mono', monospace;
     --font-ui:   'Syne', sans-serif;
-    --radius:    10px;
-    --radius-sm: 6px;
+    --radius:    16px;
+    --radius-sm: 10px;
+    --tap:      48px;
+    --app-h:    100dvh;
+    --safe-t:   env(safe-area-inset-top, 0px);
+    --safe-r:   env(safe-area-inset-right, 0px);
+    --safe-b:   env(safe-area-inset-bottom, 0px);
+    --safe-l:   env(safe-area-inset-left, 0px);
   }
 
   html, body {
     height: 100%;
+    height: var(--app-h, 100dvh);
+    max-height: var(--app-h, 100dvh);
+    min-height: 0;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-mono);
     font-size: 13px;
     overflow: hidden;
   }
+  html { -webkit-text-size-adjust: 100%; }
+  body { padding: 0; }
 
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 4px; }
@@ -56,10 +70,19 @@
   /* ── Layout ── */
   #app {
     display: grid;
-    grid-template-rows: 52px 1fr;
-    grid-template-columns: 280px 1fr;
-    height: 100vh;
+    grid-template-rows: 60px 1fr;
+    grid-template-columns: 300px 1fr;
+    height: 100%;
+    height: var(--app-h, 100dvh);
+    max-height: var(--app-h, 100dvh);
+    min-height: 0;
+    width: 100%;
+    padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
     gap: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(109,124,255,0.14), transparent 55%),
+      radial-gradient(900px 500px at 0% 100%, rgba(61,214,140,0.06), transparent 50%),
+      var(--bg);
   }
 
   /* ── Header ── */
@@ -68,13 +91,46 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
-    background: rgba(15,17,23,0.82);
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    border-bottom: 1px solid rgba(88,101,242,0.12);
+    gap: 16px;
+    padding: 0 22px;
+    background: rgba(8,10,16,0.78);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-bottom: 1px solid rgba(109,124,255,0.14);
     position: relative;
     z-index: 10;
+  }
+
+  .view-switch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(18,21,30,0.9);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .view-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 8px 18px;
+    min-height: 36px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .view-btn:hover { color: var(--text); }
+  .view-btn.active {
+    background: linear-gradient(135deg, var(--accent), #4f5dff);
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(109,124,255,0.35);
   }
 
   .logo {
@@ -86,6 +142,18 @@
     font-weight: 700;
     letter-spacing: -0.3px;
     color: #fff;
+    flex-shrink: 0;
+  }
+  .logo-ver {
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #fff;
+    background: rgba(109,124,255,0.28);
+    border: 1px solid rgba(109,124,255,0.45);
   }
 
   .logo-icon {
@@ -110,6 +178,7 @@
     min-width: 0;
     overflow: hidden;
     flex-shrink: 1;
+    margin-left: auto;
   }
 
   .status-badge {
@@ -377,11 +446,12 @@
 
   /* ── Main Area ── */
   #main {
-    display: flex;
+    display: none;
     flex-direction: column;
     background: var(--bg);
     overflow: hidden;
   }
+  #main.active-view { display: flex; }
 
   /* ── Log Toolbar ── */
   .log-toolbar {
@@ -741,7 +811,9 @@
   .alert-img {
     width: 100px; height: 100px; object-fit: contain;
     border-radius: 8px; border: 1px solid var(--border2);
-    background: #0d0f1a; display: block;
+    background: #101218; display: block;
+    filter: brightness(0.92) contrast(0.94) saturate(0.96);
+    cursor: zoom-in;
   }
 
   /* Time */
@@ -1227,17 +1299,19 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     MOBILE BREAKPOINT (≤ 768px)
+     TABLET + PHONE (≤ 1180px) — wall display, settings as drawer
      ══════════════════════════════════════════════════════════ */
-  @media (max-width: 768px) {
+  @media (max-width: 1180px) {
     #app {
       grid-template-columns: 1fr;
-      grid-template-rows: 48px 1fr;
-      padding-bottom: 60px; /* space for bottom nav */
+      grid-template-rows: 56px 1fr;
+      padding-bottom: 64px; /* space for bottom nav */
     }
 
     /* Header — compact */
-    #header { padding: 0 10px; height: 48px; }
+    #header { padding: 0 12px; height: 56px; }
+    .view-switch { padding: 3px; }
+    .view-btn { padding: 8px 14px; font-size: 12px; min-height: 34px; }
     .logo { font-size: 14px; gap: 8px; }
     .logo-icon { width: 26px; height: 26px; border-radius: 6px; }
     .logo-icon svg { width: 26px; height: 26px; }
@@ -1267,9 +1341,13 @@
     #mobile-bottom-nav { display: block; }
     .mobile-status-bar { display: flex; }
 
-    /* Main area — full width on mobile (sidebar is position:fixed, out of grid) */
-    #main { grid-column: 1 / -1; grid-row: 2; }
-    #deals-container { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+    /* Main area — full width (sidebar is position:fixed, out of grid) */
+    #main, #deals-container, #dashboard-container { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+    .dash-hero { padding: 18px 18px 6px; }
+    .dash-scroll { padding: 8px 16px 24px; }
+    .dash-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .drop-media { height: 200px; }
+    .drop-title { font-size: 18px; }
 
     /* Log toolbar — stacked */
     .log-toolbar {
@@ -1558,6 +1636,396 @@
   }
   .empty-state-action:hover { background: var(--accent2); }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     DASHBOARD WALL (tablet-first)
+     ═══════════════════════════════════════════════════════════════════════ */
+  #dashboard-container {
+    display: none;
+    overflow: hidden;
+    flex-direction: column;
+    background: transparent;
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+  }
+  #dashboard-container.active { display: flex; }
+
+  .dash-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 28px 10px;
+    flex-shrink: 0;
+  }
+  .dash-hero h1 {
+    font-family: var(--font-ui);
+    font-size: clamp(28px, 3.4vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: #fff;
+    line-height: 1;
+  }
+  .dash-hero p {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    max-width: 52ch;
+  }
+  .dash-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(18,21,30,0.75);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .dash-live .pulse {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .dash-live.is-on .pulse {
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  .dash-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 24px 28px;
+  }
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+  }
+  @media (min-width: 900px) {
+    .dash-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  }
+  @media (min-width: 1400px) {
+    .dash-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .drop-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 420px;
+    border-radius: 22px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(24,28,40,0.92), rgba(12,14,20,0.96));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .drop-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(109,124,255,0.35);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(109,124,255,0.15);
+  }
+  .drop-card.is-fresh {
+    border-color: rgba(61,214,140,0.45);
+    box-shadow: 0 0 0 1px rgba(61,214,140,0.25), 0 20px 50px rgba(61,214,140,0.12);
+  }
+  .drop-card.pri-high { outline: 2px solid rgba(255,93,98,0.45); }
+
+  .drop-media {
+    position: relative;
+    height: 220px;
+    background: #101218;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .drop-media img, .drop-photo {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+    background: #101218;
+    filter: brightness(0.92) contrast(0.94) saturate(0.96);
+    cursor: zoom-in;
+  }
+  .drop-media .drop-fallback {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 56px; opacity: 0.7;
+  }
+  .drop-badges {
+    position: absolute; top: 12px; left: 12px; right: 12px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .drop-badge {
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    letter-spacing: 0.02em;
+  }
+  .drop-badge.new { background: var(--green); color: #062; }
+  .drop-badge.urgent { background: var(--red); }
+  .drop-badge.retailer { background: rgba(109,124,255,0.85); }
+
+  .drop-body { padding: 16px 18px 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .drop-title {
+    font-family: var(--font-ui);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #fff;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .drop-meta {
+    display: flex; flex-wrap: wrap; gap: 10px 14px;
+    font-size: 12px; color: var(--muted); font-weight: 500;
+  }
+  .drop-meta .time { color: var(--cyan); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .drop-price {
+    font-family: var(--font-ui);
+    font-size: 26px; font-weight: 800; color: var(--green);
+    letter-spacing: -0.03em;
+  }
+
+  .drop-actions {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 12px 16px 16px;
+    margin-top: auto;
+  }
+  .drop-actions a, .drop-actions .drop-btn-disabled {
+    display: flex; align-items: center; justify-content: center;
+    min-height: var(--tap);
+    border-radius: 14px;
+    font-family: var(--font-ui);
+    font-size: 14px; font-weight: 800;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+  }
+  .drop-btn-atc {
+    background: linear-gradient(180deg, #4ae89c, var(--green));
+    color: #042; box-shadow: 0 8px 22px rgba(61,214,140,0.28);
+  }
+  .drop-btn-atc:hover { filter: brightness(1.06); }
+  .drop-btn-deal {
+    background: rgba(109,124,255,0.18);
+    border: 1px solid rgba(109,124,255,0.4);
+    color: #dce2ff;
+  }
+  .drop-btn-discord {
+    background: rgba(88,101,242,0.16);
+    border: 1px solid rgba(88,101,242,0.4);
+    color: #cfd5ff;
+  }
+  .drop-btn-disabled {
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    border: 1px dashed var(--border2);
+    pointer-events: none;
+  }
+
+  .dash-empty {
+    height: 100%;
+    min-height: 360px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 10px; color: var(--muted); padding: 40px;
+  }
+  .dash-hero-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .btn-fullscreen {
+    appearance: none;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #4f5dff);
+    color: #fff;
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-weight: 800;
+    min-height: 52px;
+    min-width: 168px;
+    padding: 0 22px;
+    border-radius: 16px;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 28px rgba(109,124,255,0.4);
+  }
+  .btn-fullscreen:hover, .btn-fullscreen.is-on {
+    border-color: transparent;
+    background: linear-gradient(135deg, #8b9bff, var(--accent));
+    color: #fff;
+    filter: brightness(1.04);
+  }
+  .dash-fs-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted);
+    max-width: 42ch;
+  }
+  .dash-fs-hint strong { color: var(--text); }
+  html.pwa-standalone .dash-fs-hint,
+  html.is-fullscreen .dash-fs-hint,
+  html.immersive .dash-fs-hint { display: none; }
+
+  #photo-lightbox {
+    display: none;
+    position: fixed; inset: 0; z-index: 500;
+    background: #07080c;
+    align-items: center; justify-content: center;
+    padding: 28px;
+    cursor: zoom-out;
+  }
+  #photo-lightbox.open { display: flex; }
+  #photo-lightbox img {
+    max-width: min(960px, 100%);
+    max-height: 100%;
+    width: auto; height: auto;
+    object-fit: contain;
+    background: #101218;
+    filter: brightness(0.92) contrast(0.94) saturate(0.96);
+    border-radius: 12px;
+  }
+  #photo-lightbox .lb-close {
+    position: absolute; top: 12px; right: 12px;
+    min-width: var(--tap); min-height: var(--tap);
+    border: none; border-radius: 12px;
+    background: rgba(255,255,255,0.08); color: #fff;
+    font-size: 22px; cursor: pointer;
+  }
+
+  @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+    html, body, #app {
+      height: 100%;
+      height: var(--app-h, 100dvh);
+      max-height: var(--app-h, 100dvh);
+      min-height: 0;
+    }
+  }
+  html.pwa-standalone #app,
+  html.is-fullscreen #app,
+  html.immersive #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 48px 1fr;
+    padding-bottom: var(--safe-b);
+  }
+  html.immersive #sidebar,
+  html.is-fullscreen #sidebar,
+  html.pwa-standalone #sidebar { display: none !important; }
+  html.immersive #mobile-bottom-nav,
+  html.is-fullscreen #mobile-bottom-nav,
+  html.pwa-standalone #mobile-bottom-nav { display: none !important; }
+  html.is-fullscreen #dashboard-container,
+  html.immersive #dashboard-container,
+  html.pwa-standalone #dashboard-container,
+  html.is-fullscreen #deals-container,
+  html.immersive #deals-container,
+  html.is-fullscreen #main,
+  html.immersive #main {
+    grid-column: 1 / -1 !important;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  html.is-fullscreen .view-switch,
+  html.immersive .view-switch,
+  html.is-fullscreen .mobile-menu-btn,
+  html.immersive .mobile-menu-btn,
+  html.is-fullscreen .stat-chips,
+  html.immersive .stat-chips { display: none !important; }
+  html.is-fullscreen #header,
+  html.immersive #header { height: 48px; min-height: 48px; padding: 0 12px; }
+  html.is-fullscreen .dash-hero p,
+  html.immersive .dash-hero p { display: none; }
+  html.is-fullscreen .dash-hero,
+  html.immersive .dash-hero { padding: 8px 16px 4px; }
+  html.is-fullscreen .dash-scroll,
+  html.immersive .dash-scroll { padding: 8px 16px 16px; }
+
+  /* Lenovo / Android landscape: hide remaining chrome, fill visual viewport, row cards */
+  @media (orientation: landscape) {
+    html.is-fullscreen #header,
+    html.immersive #header { display: none !important; }
+    html.is-fullscreen #app,
+    html.immersive #app,
+    html.pwa-standalone #app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+    html.is-fullscreen #dashboard-container,
+    html.immersive #dashboard-container,
+    html.pwa-standalone #dashboard-container {
+      grid-column: 1 / -1 !important;
+      grid-row: 1 / -1 !important;
+    }
+    html.is-fullscreen .dash-hero,
+    html.immersive .dash-hero { padding: 6px 12px 4px; }
+    html.is-fullscreen .dash-hero h1,
+    html.immersive .dash-hero h1 { font-size: 22px; }
+    html.is-fullscreen .dash-grid,
+    html.immersive .dash-grid {
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+      gap: 12px;
+    }
+    html.is-fullscreen .drop-card,
+    html.immersive .drop-card {
+      flex-direction: row;
+      align-items: stretch;
+      min-height: 0;
+      max-height: min(280px, calc(var(--app-h, 100dvh) - 96px));
+    }
+    html.is-fullscreen .drop-media,
+    html.immersive .drop-media {
+      width: min(240px, 38%);
+      height: auto;
+      min-height: 0;
+      align-self: stretch;
+    }
+    html.is-fullscreen .drop-media img,
+    html.is-fullscreen .drop-photo,
+    html.immersive .drop-media img,
+    html.immersive .drop-photo {
+      object-fit: contain;
+      object-position: center;
+      max-height: 100%;
+    }
+    html.is-fullscreen .drop-body,
+    html.immersive .drop-body { padding: 12px 14px 6px; min-width: 0; }
+    html.is-fullscreen .drop-title,
+    html.immersive .drop-title { font-size: 16px; }
+    html.is-fullscreen .drop-actions,
+    html.immersive .drop-actions {
+      grid-template-columns: 1.3fr 1fr 1fr 1fr;
+      padding: 8px 12px 12px;
+    }
+  }
+  @media (orientation: landscape) and (min-width: 1600px) {
+    html.is-fullscreen .dash-grid,
+    html.immersive .dash-grid {
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+    }
+    html.is-fullscreen .drop-card,
+    html.immersive .drop-card { max-height: min(320px, calc(var(--app-h, 100dvh) - 88px)); }
+  }
+
+  .dash-empty h2 {
+    font-family: var(--font-ui); font-size: 32px; color: #fff; font-weight: 800;
+  }
+
+  .btn-atc { min-height: 40px; font-size: 13px; }
+
   /* ── Pulse animation for live status ── */
   @keyframes pulse-live {
     0%, 100% { transform: scale(1); }
@@ -1586,9 +2054,9 @@
   .deal-card.profitable { border-left:3px solid var(--green); }
   .deal-card.unprofitable { border-left:3px solid var(--red); }
   .deal-card.unknown-profit { border-left:3px solid var(--muted); }
-  .deal-img-wrap { width:100%; height:180px; overflow:hidden; background:linear-gradient(180deg,rgba(10,11,15,.6),rgba(10,11,15,1)); display:flex; align-items:center; justify-content:center; position:relative; }
-  .deal-img { max-width:90%; max-height:170px; object-fit:contain; transition:transform .3s; }
-  .deal-card:hover .deal-img { transform:scale(1.05); }
+  .deal-img-wrap { width:100%; height:180px; overflow:hidden; background:#101218; display:flex; align-items:center; justify-content:center; position:relative; }
+  .deal-img { max-width:90%; max-height:170px; object-fit:contain; filter: brightness(0.92) contrast(0.94) saturate(0.96); cursor:zoom-in; }
+  .deal-card:hover .deal-img { transform:none; }
   .deal-no-img { font-size:48px; opacity:.15; color:var(--muted); }
   .deal-retailer-ribbon { position:absolute; top:10px; left:0; padding:3px 12px 3px 8px; font-size:10px; font-weight:800; letter-spacing:.3px; border-radius:0 4px 4px 0; text-transform:uppercase; }
   .deal-retailer-ribbon.rt-amazon  { background:rgba(255,153,0,.9); color:#1a1a1a; }
@@ -1636,9 +2104,8 @@
   @media (min-width:1400px) { .deals-grid { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); } }
 
   /* ── Mobile overrides for deals (must come AFTER base deals styles) ── */
-  @media (max-width: 768px) {
-    #deals-container { grid-column: 1 / -1; grid-row: 2; width: 100%; }
-    #main { grid-column: 1 / -1; grid-row: 2; }
+  @media (max-width: 1180px) {
+    #deals-container, #dashboard-container, #main { grid-column: 1 / -1; grid-row: 2; width: 100%; }
     .deals-grid { grid-template-columns: 1fr; gap: 12px; }
     .deal-img-wrap { height: 160px; }
     .deal-body { padding: 12px; }
@@ -1670,10 +2137,16 @@
           <circle cx="15" cy="25" r="1.5" fill="#3ba55c" opacity="0.9"/>
         </svg>
       </div>
-      Drop Scout
+      Drop Scout <span class="logo-ver">2.0</span>
     </div>
 
-    <button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open settings">☰</button>
+
+    <nav class="view-switch" id="view-switch" aria-label="Main views">
+      <button type="button" class="view-btn active" data-view="dashboard">Dashboard</button>
+      <button type="button" class="view-btn" data-view="feed">Feed</button>
+      <button type="button" class="view-btn" data-view="deals">Deals</button>
+    </nav>
 
     <div class="header-status">
       <div class="stat-chips">
@@ -2105,6 +2578,24 @@
     </div>
   </aside>
 
+  <!-- ── DASHBOARD WALL ── -->
+  <section id="dashboard-container" class="active">
+    <div class="dash-hero">
+      <div>
+        <h1>Live drops</h1>
+        <p>Tablet wall — tap ATC, Deal, or Discord. Newest restocks stay on top.</p>
+        <p class="dash-fs-hint" id="dash-fs-hint"></p>
+      </div>
+      <div class="dash-hero-actions">
+        <button type="button" id="btn-fullscreen" class="btn-fullscreen" title="Fill the tablet screen">⛶ Fullscreen</button>
+        <div class="dash-live" id="dash-live"><span class="pulse"></span><span id="dash-live-label">Monitor offline</span></div>
+      </div>
+    </div>
+    <div class="dash-scroll">
+      <div id="dash-grid" class="dash-grid"></div>
+    </div>
+  </section>
+
   <!-- ── MAIN LOG AREA ── -->
   <main id="main">
     <div class="log-toolbar">
@@ -2157,15 +2648,19 @@
 
 </div>
 
-<!-- Sidebar overlay (mobile) -->
+<!-- Photo lightbox -->
+<div id="photo-lightbox" role="dialog" aria-modal="true" aria-label="Product photo">
+  <button type="button" class="lb-close" id="lb-close" aria-label="Close">×</button>
+  <img id="lb-img" alt="Product">
+</div>
 <div id="sidebar-overlay"></div>
 
 <!-- Mobile Bottom Navigation -->
 <nav id="mobile-bottom-nav">
   <div class="mob-nav-inner">
-    <button class="mob-nav-btn active" data-mob-tab="control">🎮<span>Control</span></button>
-    <button class="mob-nav-btn" data-mob-tab="config">⚙️<span>Config</span></button>
-    <button class="mob-nav-btn" data-mob-tab="channels">📺<span>Channels</span></button>
+    <button class="mob-nav-btn active" data-mob-tab="dashboard">🖥<span>Dash</span></button>
+    <button class="mob-nav-btn" data-mob-tab="control">🎮<span>Control</span></button>
+    <button class="mob-nav-btn" data-mob-tab="feed">📡<span>Feed</span></button>
     <button class="mob-nav-btn" data-mob-tab="deals">💰<span>Deals</span></button>
     <button class="mob-nav-btn" data-mob-tab="stats">📊<span>Stats</span></button>
   </div>
@@ -2182,6 +2677,7 @@ const S = {
   filter: 'alert',
   searchQuery: '',
   logs: [],
+  liveAlerts: [],
   channels: [],
   keywords: [],
   config: {},
@@ -2189,6 +2685,8 @@ const S = {
   startTime: null,
   manualStarted: false,
   lastTopId: 0,
+  lastWallId: 0,
+  lastAlertAt: '',
   lastPollOk: 0,
   soundEnabled: true,
   notifsEnabled: true,
@@ -2200,6 +2698,7 @@ const S = {
   webhooks: [],             // [{url, name, enabled}]
   flipLog: JSON.parse(localStorage.getItem('dm_flip_log') || '[]'),
   statsInterval: null,
+  activeView: 'dashboard',
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -2469,6 +2968,9 @@ function parseStructuredContent(raw) {
       if (textOnly && !/^<@/.test(line)) result.bodyLines.push(textOnly);
     }
     result.title = heading || result.bodyLines.shift() || '';
+    if (isAlertChromeTitle(result.title) && result.bodyLines.length) {
+      result.title = result.bodyLines.shift();
+    }
     return result;
   }
 
@@ -2476,7 +2978,7 @@ function parseStructuredContent(raw) {
   // First non-key, non-mention line is the title
   while (i < lines.length) {
     const candidate = stripDiscordMentions(lines[i]);
-    if (candidate && !knownKeys.has(candidate.toLowerCase())) {
+    if (candidate && !knownKeys.has(candidate.toLowerCase()) && !isAlertChromeTitle(candidate)) {
       result.title = candidate;
       i++;
       break;
@@ -2554,6 +3056,230 @@ function parseStructuredContent(raw) {
   return result;
 }
 
+function pickDealUrl(parsed, details) {
+  const fromParsed = (parsed && parsed.productUrls || []).find(u => u && !/discord\.com|cdn\.discord/i.test(u));
+  if (fromParsed) return fromParsed;
+  const fromLinks = (parsed && parsed.links || []).find(l => l && l.url && !/discord\.com|cdn\.discord/i.test(l.url));
+  if (fromLinks) return fromLinks.url;
+  const fromBackend = (details.links || []).find(u => u && !/discord\.com|cdn\.discord|(\.jpg|\.png|\.webp|\.gif)(\?|$)/i.test(u));
+  return fromBackend || '';
+}
+
+const _EBAY_JUNK = /^(new|drop|live|restock|in|stock|alert|deal|now|today|limited|wow|everyone|here|update|posted|match|channel|discord|monitor|keyword|keywords|post|message)$/i;
+
+function isAlertChromeTitle(s) {
+  let t = String(s || '')
+    .replace(/[\u{1F300}-\u{1FAFF}🚨🔔📬]/gu, ' ')
+    .replace(/[#*_`|>]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!t) return true;
+  if (/^(restock|drop|deal|live|stock)\s+alerts?$/.test(t)) return true;
+  if (/^match\s+in\s+#?\S*$/.test(t)) return true;
+  if (/^new\s+post(\s+in\s+#?\S*)?$/.test(t)) return true;
+  const words = t.split(/\s+/).filter(w => w.length > 1 && !_EBAY_JUNK.test(w));
+  return words.length === 0;
+}
+
+function stripAlertChrome(s) {
+  return String(s || '')
+    .replace(/^[\s\u{1F300}-\u{1FAFF}🚨🔔📬]+/u, '')
+    .replace(/^(?:restock|drop|deal|live|stock)\s+alerts?\s*[:\-–]?\s*/i, '')
+    .replace(/^match\s+in\s+#?\S+\s*[:\-–]?\s*/i, '')
+    .replace(/^new\s+post\s+in\s+#?\S+\s*[:\-–]?\s*/i, '')
+    .trim();
+}
+
+function productTitleFromAlert(details, parsed) {
+  const d = details || {};
+  if (d.product_title && !isAlertChromeTitle(d.product_title)) {
+    return String(d.product_title).trim().slice(0, 150);
+  }
+  const candidates = [];
+  if (parsed && parsed.title) candidates.push(parsed.title);
+  if (parsed && parsed.bodyLines) candidates.push(...parsed.bodyLines);
+  for (const line of String(d.content || '').split('\n')) candidates.push(line);
+  const skipKey = /^(sku|price|seller|offer id|add to cart|links|type|order limit|recommended price)$/i;
+  for (const c of candidates) {
+    let t = stripDiscordMentions(String(c || '')).replace(/^#+\s*/, '');
+    t = stripAlertChrome(t)
+      .replace(/https?:\/\/\S+/gi, ' ')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (t && t.length >= 4 && !skipKey.test(t) && !isAlertChromeTitle(t)) return t.slice(0, 150);
+  }
+  return '';
+}
+
+function buildEbaySoldQuery(item) {
+  const it = item || {};
+  let title = productTitleFromAlert(
+    { product_title: it.productTitle, content: it.content || '' },
+    { title: it.title, bodyLines: it.bodyLines || [] }
+  ) || String(it.title || '');
+  title = stripDiscordMentions(title)
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*_`|>]+/g, ' ');
+  title = stripAlertChrome(title).replace(/\s+/g, ' ').trim();
+  const tokens = title.split(/\s+/).filter(t => t.length > 1 && !_EBAY_JUNK.test(t));
+  const asin = String(it.asin || '').trim();
+  const sku = String(it.sku || '').trim();
+  const skuIsAsin = /^B0[A-Z0-9]{8}$/i.test(sku);
+  const ident = (asin.length === 10 ? asin : '') || (skuIsAsin ? sku : '');
+  const extraSku = sku && !skuIsAsin && sku.length >= 6 ? sku : '';
+  let query = '';
+  if (tokens.length >= 2) query = tokens.join(' ');
+  else if (tokens.length === 1 && tokens[0].length >= 4) {
+    query = ident ? `${tokens[0]} ${ident}` : (extraSku ? `${tokens[0]} ${extraSku}` : tokens[0]);
+  } else if (ident) query = ident;
+  else if (extraSku) query = extraSku;
+  else query = isAlertChromeTitle(title) ? '' : title;
+  query = query.replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (isAlertChromeTitle(query)) query = ident || extraSku || '';
+  const soldUrl = query
+    ? `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=12`
+    : 'https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1';
+  return { query, soldUrl };
+}
+
+function extractDropCard(entry) {
+  const d = entry.details || {};
+  const p = parseStructuredContent(d.content || '');
+  const title = productTitleFromAlert(d, p) || '(no content)';
+  const atcUrl = (p && p.atcUrl) || '';
+  const dealUrl = pickDealUrl(p, d);
+  const img = (d.image_urls || []).find(u => u && !/\.(gif|svg)(\?|$)/i.test(u)) || '';
+  const retailer = detectRetailer(atcUrl || dealUrl);
+  return {
+    id: entry.id,
+    title,
+    price: (p && p.price) || '',
+    atcUrl,
+    dealUrl,
+    jumpUrl: d.jump_url || '',
+    img,
+    channel: d.channel || '',
+    server: d.server || '',
+    timestamp: d.created_at || d.timestamp || '',
+    priority: d.priority || 'medium',
+    retailer,
+    asin: d.asin || (p && p.sku && /^B0[A-Z0-9]{8}$/.test(p.sku) ? p.sku : '') || '',
+    sku: (p && p.sku) || '',
+    content: d.content || '',
+    productTitle: d.product_title || '',
+    bodyLines: (p && p.bodyLines) || [],
+  };
+}
+
+function retailerEmoji(drop) {
+  if (drop.retailer) return drop.retailer.icon;
+  if (/amazon/i.test(drop.atcUrl + drop.dealUrl + drop.title)) return '🅰';
+  if (/target/i.test(drop.atcUrl + drop.dealUrl + drop.title)) return '🎯';
+  if (/walmart/i.test(drop.atcUrl + drop.dealUrl + drop.title)) return '🏪';
+  return '📦';
+}
+
+function liveDropAlerts(source, cap) {
+  cap = cap || 24;
+  const alerts = (source || [])
+    .filter(l => l && l.level === 'alert' && l.details)
+    .slice()
+    .sort((a, b) => (b.id || 0) - (a.id || 0));
+  const featured = [];
+  const extra = [];
+  const seen = new Set();
+  for (const a of alerts) {
+    const d = a.details || {};
+    const key = String(d.watch_channel_id || d.parent_channel_id || d.channel_id || d.channel || a.id);
+    if (!seen.has(key)) {
+      seen.add(key);
+      featured.push(a);
+    } else {
+      extra.push(a);
+    }
+  }
+  return featured.concat(extra).slice(0, cap);
+}
+
+function renderDashboard() {
+  const grid = document.getElementById('dash-grid');
+  if (!grid) return;
+  const alerts = liveDropAlerts(S.liveAlerts && S.liveAlerts.length ? S.liveAlerts : S.logs, 24);
+  if (!alerts.length) {
+    grid.innerHTML = `<div class="dash-empty" style="grid-column:1/-1">
+      <h2>Waiting for drops</h2>
+      <p>Start the monitor from Control. New restocks land here as large tap cards.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = alerts.map(entry => {
+    const drop = extractDropCard(entry);
+    const ageMin = minutesAgo(drop.timestamp);
+    const fresh = ageMin < 1.5;
+    const timeLabel = drop.timestamp ? formatTimeAgo(new Date(drop.timestamp)) : (entry.time || '');
+    const clock = drop.timestamp ? new Date(drop.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (entry.time || '');
+    const media = drop.img
+      ? `<img class="drop-photo" src="${escHtml(drop.img)}" alt="" loading="lazy" data-full="${escHtml(drop.img)}" onerror="this.outerHTML='<div class=drop-fallback>📦</div>'">`
+      : `<div class="drop-fallback">${retailerEmoji(drop)}</div>`;
+    const atc = drop.atcUrl
+      ? `<a class="drop-btn-atc" href="${escHtml(drop.atcUrl)}" target="_blank" rel="noopener">🛒 ATC</a>`
+      : `<span class="drop-btn-disabled">No ATC</span>`;
+    const deal = drop.dealUrl
+      ? `<a class="drop-btn-deal" href="${escHtml(drop.dealUrl)}" target="_blank" rel="noopener">Deal</a>`
+      : `<span class="drop-btn-disabled">Deal</span>`;
+    const disc = drop.jumpUrl
+      ? `<a class="drop-btn-discord" href="${escHtml(drop.jumpUrl)}" target="_blank" rel="noopener">Discord</a>`
+      : `<span class="drop-btn-disabled">Discord</span>`;
+    const ebayQ = buildEbaySoldQuery(drop);
+    const ebayBtn = ebayQ.query
+      ? `<a class="drop-btn-deal" href="${escHtml(ebayQ.soldUrl)}" target="_blank" rel="noopener" title="eBay sold: ${escHtml(ebayQ.query)}">eBay</a>`
+      : `<span class="drop-btn-disabled">eBay</span>`;
+    const badges = [
+      ageMin < 5 ? '<span class="drop-badge new">NEW</span>' : '',
+      drop.priority === 'high' ? '<span class="drop-badge urgent">URGENT</span>' : '',
+      drop.retailer ? `<span class="drop-badge retailer">${escHtml(drop.retailer.icon + ' ' + drop.retailer.name)}</span>` : '',
+    ].join('');
+    return `<article class="drop-card${fresh ? ' is-fresh' : ''}${drop.priority === 'high' ? ' pri-high' : ''}">
+      <div class="drop-media">${media}<div class="drop-badges">${badges}</div></div>
+      <div class="drop-body">
+        <div class="drop-title">${escHtml(drop.title)}</div>
+        ${drop.price ? `<div class="drop-price">${escHtml(drop.price)}</div>` : ''}
+        <div class="drop-meta">
+          <span class="time">${escHtml(clock)} · ${escHtml(timeLabel)}</span>
+          ${drop.channel ? `<span>#${escHtml(drop.channel)}</span>` : ''}
+          ${drop.server ? `<span>${escHtml(drop.server)}</span>` : ''}
+        </div>
+      </div>
+      <div class="drop-actions">${atc}${deal}${disc}${ebayBtn}</div>
+    </article>`;
+  }).join('');
+}
+
+function syncViewButtons(view) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  const mobMap = { dashboard: 'dashboard', logs: 'feed', feed: 'feed', deals: 'deals' };
+  const mob = mobMap[view] || 'dashboard';
+  document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mobTab === mob));
+}
+
+function switchMainView(view) {
+  S.activeView = view;
+  const dash = document.getElementById('dashboard-container');
+  const main = document.getElementById('main');
+  const deals = document.getElementById('deals-container');
+  dash.classList.toggle('active', view === 'dashboard');
+  main.classList.toggle('active-view', view === 'logs' || view === 'feed');
+  deals.classList.toggle('active', view === 'deals');
+  _dealsState.activeView = view === 'deals' ? 'deals' : (view === 'dashboard' ? 'dashboard' : 'logs');
+  syncViewButtons(view === 'feed' ? 'feed' : view);
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'logs' || view === 'feed') rebuildLogs();
+  if (view === 'deals') loadDeals();
+}
+
 // ── Log rendering ──────────────────────────────────────────────────────────
 const levelIcons = { alert: '🔔', success: '✅', error: '❌', warning: '⚠️', info: '◦' };
 
@@ -2614,7 +3340,7 @@ function renderLog(entry) {
     const authorPill = d.author ? `<span class="meta-pill author">👤 ${escHtml(d.author)}</span>` : '';
 
     // ── Title ──────────────────────────────────────────────────────────────
-    const rawTitle = (p && p.title) || (d.content||'').split('\n')[0].replace(/^#+\s*/,'') || '(no content)';
+    const rawTitle = productTitleFromAlert(d, p) || (p && p.title) || (d.content||'').split('\n')[0].replace(/^#+\s*/,'') || '(no content)';
     const title = stripDiscordMentions(rawTitle).replace(/^#+\s*/,'') || '(no content)';
 
     // ── Retailer badge ─────────────────────────────────────────────────────
@@ -2683,7 +3409,7 @@ function renderLog(entry) {
     const isImgUrl = u => /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(u) || /walmartimages|media-amazon|images-bn|cdn\.discordapp|prodimage/i.test(u);
     const imgs = (d.image_urls||[]).filter(u => u && !/(gif|svg)$/i.test(u)).slice(0,3);
     const imgHTML = imgs.length
-      ? `<div class="alert-images">${imgs.map(u=>`<a href="${escHtml(u)}" target="_blank" rel="noopener"><img class="alert-img" src="${escHtml(u)}" alt="product" loading="lazy"></a>`).join('')}</div>`
+      ? `<div class="alert-images">${imgs.map(u=>`<img class="alert-img" src="${escHtml(u)}" alt="product" loading="lazy" data-full="${escHtml(u)}">`).join('')}</div>`
       : '';
 
     // ── Action buttons ────────────────────────────────────────────────────
@@ -2729,11 +3455,12 @@ function renderLog(entry) {
       : '';
 
     // ── Auto search buttons from title ──────────────────────────────────────
-    const searchTitle = encodeURIComponent((title || '').substring(0, 120).trim());
-    const searchBtns = searchTitle ? `
-      <a class="qlink qlink-ebay" href="https://www.ebay.com/sch/i.html?_nkw=${searchTitle}" target="_blank" rel="noopener">🔍 eBay</a>
-      <a class="qlink qlink-amazon" href="https://www.amazon.com/s?k=${searchTitle}" target="_blank" rel="noopener">🔍 Amazon</a>
-      <a class="qlink qlink-keepa" href="https://keepa.com/#!search/1-${searchTitle}" target="_blank" rel="noopener">📊 Keepa</a>
+    const searchQ = buildEbaySoldQuery({ title, asin: d.asin || (p && p.sku) || '', sku: (p && p.sku) || '', content: d.content || '', productTitle: d.product_title || '', bodyLines: (p && p.bodyLines) || [] });
+    const searchEnc = encodeURIComponent((searchQ.query || title || '').substring(0, 120).trim());
+    const searchBtns = searchEnc ? `
+      <a class="qlink qlink-ebay" href="${escHtml(searchQ.soldUrl)}" target="_blank" rel="noopener" title="${escHtml(searchQ.query)}">🔍 eBay Sold</a>
+      <a class="qlink qlink-amazon" href="https://www.amazon.com/s?k=${searchEnc}" target="_blank" rel="noopener">🔍 Amazon</a>
+      <a class="qlink qlink-keepa" href="https://keepa.com/#!search/1-${searchEnc}" target="_blank" rel="noopener">📊 Keepa</a>
     ` : '';
 
     // ── Product IDs (ASIN/TCIN) ──────────────────────────────────────────────
@@ -2883,18 +3610,24 @@ async function pollOnce() {
 
     // Logs — only rebuild when data actually changes
     const logs = Array.isArray(logData.logs) ? logData.logs : [];
+    const wall = Array.isArray(logData.alerts) ? logData.alerts : logs;
     const newTopId = logs.length ? logs[0].id : 0;
+    const wallTop = wall.length ? wall[0].id : 0;
     const newCount = typeof logData.alert_count === 'number' ? logData.alert_count : (statusData.alert_count || 0);
 
-    if (newTopId !== S.lastTopId || newCount !== S.alertCount) {
+    const lastAlertAt = statusData.last_alert_at || '';
+    if (newTopId !== S.lastTopId || newCount !== S.alertCount || wallTop !== S.lastWallId
+        || lastAlertAt !== S.lastAlertAt || wall.length !== (S.liveAlerts || []).length) {
       S.logs = logs;
+      S.liveAlerts = wall;
       S.lastTopId = newTopId;
+      S.lastWallId = wallTop;
+      S.lastAlertAt = lastAlertAt;
       updateAlertCount(newCount);
-      rebuildLogs();
-      // Auto-refresh deals view when new alerts come in
-      if (_dealsState.activeView === 'deals') {
-        loadDeals();
-      }
+      // Rebuild only the visible surface so the alert path stays cheap.
+      if (S.activeView === 'dashboard') renderDashboard();
+      else if (S.activeView === 'logs' || S.activeView === 'feed') rebuildLogs();
+      else if (S.activeView === 'deals') loadDeals();
     }
 
     // Update remote access UI from poll
@@ -2988,6 +3721,10 @@ function updateStatus(running) {
   btnStart.style.display = running ? 'none' : '';
   btnStop.style.display = running ? '' : 'none';
   uptime.classList.toggle('visible', running);
+  const dashLive = document.getElementById('dash-live');
+  const dashLbl = document.getElementById('dash-live-label');
+  if (dashLive) dashLive.classList.toggle('is-on', !!running);
+  if (dashLbl) dashLbl.textContent = running ? 'Live monitoring' : 'Monitor offline';
 
   if (!running && S.uptimeInterval) {
     clearInterval(S.uptimeInterval);
@@ -3044,7 +3781,7 @@ function updateAlertCount(n) {
   document.getElementById('h-alerts').textContent = n;
 
   // Tab title badge
-  document.title = n > 0 ? `(${n}) Drop Scout` : 'Drop Scout';
+  document.title = n > 0 ? `(${n}) Drop Scout 2.0` : 'Drop Scout 2.0';
 
   if (isNew) {
     // Flash the alerts chip
@@ -3411,9 +4148,20 @@ async function loadAll() {
     const logData = await api.get('/api/logs');
     const initLogs = Array.isArray(logData.logs) ? logData.logs : [];
     S.logs = initLogs;
+    S.liveAlerts = Array.isArray(logData.alerts) ? logData.alerts : initLogs.filter(l => l.level === 'alert');
     S.lastTopId = initLogs.length ? initLogs[0].id : 0;
+    S.lastWallId = S.liveAlerts.length ? S.liveAlerts[0].id : 0;
     updateAlertCount(logData.alert_count || 0);
-    rebuildLogs();
+    if (new URLSearchParams(location.search).has('demo') && !S.logs.some(l => l.level === 'alert')) {
+      await api.post('/api/test_alert', {});
+      const seeded = await api.get('/api/logs');
+      S.logs = Array.isArray(seeded.logs) ? seeded.logs : S.logs;
+      S.liveAlerts = Array.isArray(seeded.alerts) ? seeded.alerts : S.logs.filter(l => l.level === 'alert');
+      S.lastTopId = S.logs.length ? S.logs[0].id : 0;
+      S.lastWallId = S.liveAlerts.length ? S.liveAlerts[0].id : 0;
+      updateAlertCount(seeded.alert_count || S.alertCount);
+    }
+    renderDashboard();
 
   } catch(e) {
     toast('Could not connect to server. Is the Drop Scout server running?', 'error', 6000);
@@ -3554,7 +4302,7 @@ function processAlertsIntoDeals(alerts) {
   for (const alert of alerts) {
     const d = alert.details || {};
     const p = parseStructuredContent(d.content || '');
-    const rawTitle = (p && p.title) ? stripDiscordMentions(p.title).replace(/^#+\s*/,'') : '';
+    const rawTitle = productTitleFromAlert(d, p) || ((p && p.title) ? stripDiscordMentions(p.title).replace(/^#+\s*/,'') : '');
     const title = rawTitle.substring(0, 150).trim();
     if (!title || title === '(no content)') continue;
 
@@ -3626,19 +4374,64 @@ async function loadDeals() {
 
 const EBAY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
-async function ebayLookup(deal, forceRefresh = false) {
-  // Check cache validity — expire after 30 min so prices stay current
+function openEbaySoldTab(url) {
+  if (!url) return;
+  let opened = null;
+  try { opened = window.open(url, '_blank', 'noopener,noreferrer'); } catch (_) {}
+  if (opened) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function ebayLookup(deal, forceRefresh = false, openOnFail = false) {
+  const built = buildEbaySoldQuery(deal);
   if (!forceRefresh && deal.ebayData && deal.ebayData.count > 0) {
     const fetchedAt = deal.ebayData.fetched_at ? new Date(deal.ebayData.fetched_at).getTime() : 0;
     if (Date.now() - fetchedAt < EBAY_CACHE_TTL) return deal.ebayData;
   }
+  if (!built.query) {
+    const empty = {
+      error: 'No product title, ASIN, or SKU to search on eBay',
+      query: '', count: 0, prices: [], avg: 0, median: 0,
+      search_url: built.soldUrl, manual_url: built.soldUrl,
+      fetched_at: new Date().toISOString(),
+    };
+    deal.ebayData = empty;
+    _dealsState.ebayCache[deal.key] = empty;
+    return empty;
+  }
   try {
-    const data = await api.post('/api/ebay-lookup', { query: deal.title });
-    deal.ebayData = data;
-    _dealsState.ebayCache[deal.key] = data;
-    return data;
-  } catch(e) {
-    return { error: String(e), prices: [], avg: 0, count: 0 };
+    const data = await api.post('/api/ebay-lookup', {
+      query: built.query,
+      title: deal.title || '',
+      asin: deal.asin || '',
+      sku: deal.sku || '',
+      content: deal.content || '',
+    });
+    const packed = Object.assign({ count: 0, prices: [], query: built.query, search_url: built.soldUrl }, data || {});
+    if (!packed.search_url) packed.search_url = built.soldUrl;
+    packed.manual_url = packed.search_url;
+    deal.ebayData = packed;
+    _dealsState.ebayCache[deal.key] = packed;
+    if (!(packed.count > 0) && openOnFail) {
+      openEbaySoldTab(packed.search_url || built.soldUrl);
+    }
+    return packed;
+  } catch (e) {
+    const fail = {
+      error: String(e), query: built.query, count: 0, prices: [], avg: 0, median: 0,
+      search_url: built.soldUrl, manual_url: built.soldUrl,
+      fetched_at: new Date().toISOString(),
+    };
+    deal.ebayData = fail;
+    _dealsState.ebayCache[deal.key] = fail;
+    if (openOnFail) openEbaySoldTab(built.soldUrl);
+    return fail;
   }
 }
 
@@ -3733,7 +4526,7 @@ function renderDeals() {
 
     // Image
     const imgHtml = deal.img
-      ? `<img class="deal-img" src="${escHtml(deal.img)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=deal-no-img>📦</div>'">`
+      ? `<img class="deal-img" src="${escHtml(deal.img)}" alt="" loading="lazy" data-full="${escHtml(deal.img)}" onerror="this.parentElement.innerHTML='<div class=deal-no-img>📦</div>'">`
       : '<div class="deal-no-img">📦</div>';
 
     // Retailer ribbon
@@ -3755,10 +4548,11 @@ function renderDeals() {
         } catch(_){}
       }
       ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay Median <span style="color:var(--muted);font-size:9px">${fetchedAgo ? '· '+fetchedAgo : ''}</span></span><span class="deal-ebay-price">$${deal.ebayData.median.toFixed(2)}</span><span style="color:var(--muted);font-size:9px">${deal.ebayData.count} sold · avg $${deal.ebayData.avg.toFixed(2)}</span></div>`;
-    } else if (deal.ebayData && deal.ebayData.count === 0) {
-      const manualUrl = deal.ebayData.manual_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(deal.title.substring(0,100))}&LH_Complete=1&LH_Sold=1&_sop=12`;
-      const note = deal.ebayData.blocked ? 'eBay blocked — check manually' : (deal.ebayData.note || 'No sold data found');
-      ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay</span><a href="${escHtml(manualUrl)}" target="_blank" rel="noopener" class="deal-ebay-price loading" style="color:var(--yellow);text-decoration:underline;cursor:pointer;font-size:10px">${escHtml(note)}</a></div>`;
+    } else if (deal.ebayData) {
+      const manualUrl = deal.ebayData.search_url || deal.ebayData.manual_url || buildEbaySoldQuery(deal).soldUrl;
+      const usedQ = deal.ebayData.query || buildEbaySoldQuery(deal).query;
+      const why = deal.ebayData.error || (deal.ebayData.blocked ? 'eBay CAPTCHA blocked the scrape' : (deal.ebayData.note || 'No sold data found'));
+      ebayHtml = `<div class="deal-price-col"><span class="deal-price-label">eBay</span><a href="${escHtml(manualUrl)}" target="_blank" rel="noopener" class="deal-ebay-price loading" style="color:var(--yellow);text-decoration:underline;cursor:pointer;font-size:10px;line-height:1.35">${escHtml(why)}${usedQ ? `<br><span style="color:var(--muted);font-weight:400">searched: ${escHtml(usedQ)}</span>` : ''}</a></div>`;
     }
 
     // Profit row
@@ -3775,7 +4569,8 @@ function renderDeals() {
     }
 
     // Search query for eBay/Amazon
-    const sq = encodeURIComponent(deal.title.substring(0, 100));
+    const sqBuilt = buildEbaySoldQuery(deal);
+    const sq = encodeURIComponent(sqBuilt.query || deal.title || '');
 
     // ── Product IDs for deal card ──
     const dealPids = extractProductIds(deal.content || '', deal.links || []);
@@ -3786,8 +4581,8 @@ function renderDeals() {
     const dealPidsHtml = renderProductIdsHtml(dealPids, deal.key);
 
     // Lookup button — only shown when no eBay data yet, separate from link buttons
-    const lookupBtn = (!deal.ebayData)
-      ? `<button type="button" class="deal-lookup-btn" data-deal-key="${escHtml(deal.key)}">📊 Check eBay Price</button>`
+    const lookupBtn = (!deal.ebayData || !(deal.ebayData.count > 0))
+      ? `<button type="button" class="deal-lookup-btn" data-deal-key="${escHtml(deal.key)}">${deal.ebayData ? '📊 Retry eBay Price' : '📊 Check eBay Price'}</button>`
       : '';
 
     return `<div class="deal-card ${profitClass}" data-deal-idx="${i}">
@@ -3809,7 +4604,7 @@ function renderDeals() {
         ${deal.offerId ? `<div class="deal-offer-id"><span class="offer-id-label">Offer ID</span><code class="offer-id-value" title="Click to copy">${escHtml(deal.offerId.length > 40 ? deal.offerId.substring(0, 37) + '...' : deal.offerId)}</code><button class="offer-id-copy" data-offer-id="${escHtml(deal.offerId)}" title="Copy full Offer ID">📋</button></div>` : ''}
         ${lookupBtn}
         <div class="deal-actions">
-          <a class="deal-action-btn" href="https://www.ebay.com/sch/i.html?_nkw=${sq}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener">🔍 eBay Sold</a>
+          <a class="deal-action-btn" href="${escHtml(sqBuilt.soldUrl)}" target="_blank" rel="noopener" title="${escHtml(sqBuilt.query)}">🔍 eBay Sold</a>
           <a class="deal-action-btn" href="https://www.amazon.com/s?k=${sq}" target="_blank" rel="noopener">🅰 Amazon</a>
           <a class="deal-action-btn" href="https://keepa.com/#!search/1-${sq}" target="_blank" rel="noopener">📊 Keepa</a>
           ${deal.jumpUrl ? `<a class="deal-action-btn" href="${escHtml(deal.jumpUrl)}" target="_blank" rel="noopener">↗ Discord</a>` : ''}
@@ -3820,18 +4615,8 @@ function renderDeals() {
   }).join('');
 }
 
-function switchToDealsView() {
-  _dealsState.activeView = 'deals';
-  document.getElementById('main').style.display = 'none';
-  document.getElementById('deals-container').classList.add('active');
-  loadDeals();
-}
-
-function switchToLogsView() {
-  _dealsState.activeView = 'logs';
-  document.getElementById('main').style.display = '';
-  document.getElementById('deals-container').classList.remove('active');
-}
+function switchToDealsView() { switchMainView('deals'); }
+function switchToLogsView() { switchMainView('feed'); }
 
 // ── Polling ────────────────────────────────────────────────────────────────
 function startPolling() {
@@ -3871,12 +4656,203 @@ async function saveConfig() {
   }
 }
 
+function isStandaloneDisplay() {
+  return !!(window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: minimal-ui)').matches
+    || window.navigator.standalone);
+}
+
+function isLanHttp() {
+  const h = location.hostname;
+  const local = h === 'localhost' || h === '127.0.0.1' || h === '::1';
+  return location.protocol === 'http:' && !local;
+}
+
+function isIpadLike() {
+  const ua = navigator.userAgent || '';
+  return /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent || '');
+}
+
+function fsElement() {
+  return document.fullscreenElement
+    || document.webkitFullscreenElement
+    || document.msFullscreenElement
+    || null;
+}
+
+function syncViewportHeight() {
+  const vv = window.visualViewport;
+  const h = Math.round((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight);
+  if (h > 0) document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+
+function isPortraitNow() {
+  try {
+    if (screen.orientation && screen.orientation.type) {
+      return String(screen.orientation.type).startsWith('portrait');
+    }
+  } catch (_) {}
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia('(orientation: portrait)').matches;
+  }
+  return window.innerHeight > window.innerWidth;
+}
+
+async function maybeLockLandscape() {
+  if (!isPortraitNow()) return;
+  const ori = screen.orientation;
+  if (!ori || typeof ori.lock !== 'function') return;
+  try { await ori.lock('landscape'); } catch (_) {}
+}
+
+function tryRequestFullscreen(el) {
+  if (!el) return null;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.msRequestFullscreen;
+  if (typeof req !== 'function') return null;
+  try { return req.call(el, { navigationUI: 'hide' }); } catch (_) {
+    try { return req.call(el); } catch (e) { return Promise.reject(e); }
+  }
+}
+
+function updateFullscreenUi() {
+  syncViewportHeight();
+  const on = !!(fsElement() || document.documentElement.classList.contains('immersive'));
+  const standalone = isStandaloneDisplay();
+  document.documentElement.classList.toggle('is-fullscreen', !!fsElement());
+  document.documentElement.classList.toggle('pwa-standalone', standalone);
+  const btn = document.getElementById('btn-fullscreen');
+  if (btn) {
+    btn.classList.toggle('is-on', on || standalone);
+    if (standalone && !on) btn.textContent = 'Home screen';
+    else btn.textContent = on ? '✕ Exit Fullscreen' : '⛶ Fullscreen';
+  }
+  const hint = document.getElementById('dash-fs-hint');
+  if (hint) {
+    if (standalone) {
+      hint.innerHTML = '';
+    } else if (isIpadLike()) {
+      hint.innerHTML = 'iPad: tap <strong>Fullscreen</strong> in this page. Chrome cannot install a LAN HTTP site as an app — for a home-screen icon use <strong>Safari → Share → Add to Home Screen</strong>.';
+    } else if (isLanHttp()) {
+      hint.innerHTML = 'This is <strong>http://LAN</strong>, so Chrome will only add a shortcut, not install an app. Tap <strong>Fullscreen</strong> to fill the tablet. A real install needs an <strong>HTTPS tunnel</strong>.';
+    } else {
+      hint.innerHTML = 'Tap <strong>Fullscreen</strong> to hide browser chrome and fill the tablet.';
+    }
+  }
+}
+
+async function enterDashboardFullscreen() {
+  if (isStandaloneDisplay()) {
+    document.documentElement.classList.add('immersive');
+    updateFullscreenUi();
+    toast('Already in home-screen mode', 'info', 1800);
+    return;
+  }
+  const targets = [document.documentElement, document.getElementById('app'), document.body].filter(Boolean);
+  let apiOk = false;
+  for (const el of targets) {
+    const ret = tryRequestFullscreen(el);
+    if (!ret) continue;
+    try {
+      if (typeof ret.then === 'function') await ret;
+      apiOk = !!fsElement();
+      if (apiOk) break;
+    } catch (_) {}
+  }
+  if (!apiOk) {
+    document.documentElement.classList.add('immersive');
+    if (isIpadLike()) {
+      toast('Fullscreen mode on. For an app icon: Safari → Share → Add to Home Screen.', 'info', 4000);
+    } else if (isLanHttp()) {
+      toast('Fullscreen on. Chrome cannot install over HTTP — use this button, or an HTTPS tunnel to install.', 'info', 4000);
+    }
+  }
+  await maybeLockLandscape();
+  updateFullscreenUi();
+}
+
+async function exitDashboardFullscreen() {
+  document.documentElement.classList.remove('immersive');
+  const cur = fsElement();
+  if (cur) {
+    const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    try { if (ex) await ex.call(document); } catch (_) {}
+  }
+  updateFullscreenUi();
+}
+
+async function toggleDashboardFullscreen() {
+  if (fsElement() || document.documentElement.classList.contains('immersive')) {
+    await exitDashboardFullscreen();
+  } else {
+    await enterDashboardFullscreen();
+  }
+}
+
+function openPhotoLightbox(url) {
+  if (!url) return;
+  const box = document.getElementById('photo-lightbox');
+  const img = document.getElementById('lb-img');
+  if (!box || !img) return;
+  img.src = url;
+  box.classList.add('open');
+}
+
+function closePhotoLightbox() {
+  const box = document.getElementById('photo-lightbox');
+  const img = document.getElementById('lb-img');
+  if (box) box.classList.remove('open');
+  if (img) img.removeAttribute('src');
+}
+
 // ── Event listeners ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadAll();
   startPolling();
   initKeyboardShortcuts();
   requestNotifPermission();
+  syncViewportHeight();
+  updateFullscreenUi();
+  window.addEventListener('resize', syncViewportHeight);
+  window.addEventListener('orientationchange', syncViewportHeight);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncViewportHeight);
+    window.visualViewport.addEventListener('scroll', syncViewportHeight);
+  }
+
+  document.getElementById('btn-fullscreen')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleDashboardFullscreen();
+  });
+  ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach((ev) => {
+    document.addEventListener(ev, updateFullscreenUi);
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#lb-close') || e.target.id === 'photo-lightbox') {
+      closePhotoLightbox();
+      return;
+    }
+    const img = e.target.closest('img[data-full]');
+    if (img && img.dataset.full && !e.target.closest('a')) {
+      e.preventDefault();
+      e.stopPropagation();
+      openPhotoLightbox(img.dataset.full);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('photo-lightbox')?.classList.contains('open')) {
+      closePhotoLightbox();
+      e.preventDefault();
+      return;
+    }
+    if (fsElement() || document.documentElement.classList.contains('immersive')) {
+      exitDashboardFullscreen();
+    }
+  });
 
   // ── Mobile: Sidebar drawer open/close ──
   function openMobileSidebar() {
@@ -3899,20 +4875,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.mob-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.mobTab;
-      // Update bottom nav active state
-      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      // Trigger the sidebar nav-tab click
-      const navTab = document.querySelector(`.nav-tab[data-tab="${tab}"]`);
-      if (navTab) navTab.click();
-      // Deals/stats switch the main view — keep sidebar closed
-      // Other tabs open the sidebar drawer to show settings
-      if (tab === 'deals' || tab === 'stats') {
-        closeMobileSidebar();
-      } else {
+      if (tab === 'dashboard') { switchMainView('dashboard'); closeMobileSidebar(); }
+      else if (tab === 'feed') { switchMainView('feed'); closeMobileSidebar(); }
+      else if (tab === 'deals') { switchMainView('deals'); closeMobileSidebar(); }
+      else {
+        const navTab = document.querySelector(`.nav-tab[data-tab="${tab}"]`);
+        if (navTab) navTab.click();
         openMobileSidebar();
       }
+      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.toggle('active', b === btn));
     });
+  });
+
+  document.getElementById('view-switch')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.view-btn');
+    if (!btn) return;
+    const view = btn.dataset.view === 'feed' ? 'feed' : btn.dataset.view;
+    switchMainView(view);
   });
 
   // Sound toggle
@@ -3953,9 +4932,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = tab.dataset.tab;
       // Stats tab — fetch fresh data
       if (t === 'stats') setTimeout(() => { fetchStats(); fetchHistory(); renderFlipLog(); }, 100);
-      // Deals tab — switch main view
-      if (t === 'deals') switchToDealsView();
-      else if (_dealsState.activeView === 'deals') switchToLogsView();
+      // Deals sidebar tab opens the analyzer canvas; other settings stay on the current wall
+      if (t === 'deals') switchMainView('deals');
       // Sync tab — load status + devices
       if (t === 'sync') { loadSyncStatus(); loadSyncDevices(); }
       // Close mobile sidebar + overlay
@@ -4150,7 +5128,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-clear-logs').addEventListener('click', async () => {
     await api.post('/api/logs/clear', {});
     S.logs = [];
+    S.liveAlerts = [];
     S.lastTopId = 0;
+    S.lastWallId = 0;
     S.alertCount = 0;
     rebuildLogs();
     updateAlertCount(0);
@@ -4713,7 +5693,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!deal) return;
     btn.disabled = true;
     btn.textContent = '⏳ Looking up...';
-    await ebayLookup(deal);
+    await ebayLookup(deal, false, true);
+    if (deal.ebayData && deal.ebayData.count > 0) {
+      toast(`eBay sold: ${deal.ebayData.query} → $${deal.ebayData.median}`, 'success', 2500);
+    } else {
+      const why = (deal.ebayData && (deal.ebayData.error || deal.ebayData.note)) || 'eBay lookup failed';
+      toast(why, 'error', 5000);
+    }
     renderDeals();
   }, true);
 

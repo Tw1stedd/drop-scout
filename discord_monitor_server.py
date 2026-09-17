@@ -78,6 +78,7 @@ def save_config(config):
 state = {
     "running": False,
     "logs": [],          # list of log dicts
+    "recent_alerts": [],  # last N alerts only (Live Drops; not mixed with heartbeats)
     "alert_count": 0,
     "start_time": None,
     "monitor_thread": None,
@@ -305,6 +306,8 @@ def load_alert_history():
                     ch = details.get("channel", "")
                     if ch:
                         state["stats"]["channel_hits"][ch] = state["stats"]["channel_hits"].get(ch, 0) + 1
+                hist_alerts = [e for e in reversed(state["alert_history"]) if e.get("level") == "alert"]
+                state["recent_alerts"] = hist_alerts[:80]
         except Exception:
             pass
 
@@ -327,12 +330,13 @@ def _history_flush_loop():
 def add_log(level: str, message: str, details: dict = None):
     """Add a log entry to shared state."""
     entry = {
-        "id": int(time.time() * 1000),
+        "id": state.get("_log_seq", 0) + 1,
         "time": datetime.now().strftime("%H:%M:%S"),
         "level": level,  # info | success | warning | error | alert
         "message": message,
         "details": details or {}
     }
+    state["_log_seq"] = entry["id"]
     state["logs"].insert(0, entry)
     # Keep last 200 logs
     if len(state["logs"]) > 200:
@@ -340,6 +344,9 @@ def add_log(level: str, message: str, details: dict = None):
 
     # Persist alerts to history + update stats
     if level == "alert" and details:
+        state["recent_alerts"].insert(0, entry)
+        if len(state["recent_alerts"]) > 80:
+            state["recent_alerts"] = state["recent_alerts"][:80]
         state["alert_history"].append(entry)
         if len(state["alert_history"]) > 5000:
             state["alert_history"] = state["alert_history"][-5000:]
@@ -516,17 +523,194 @@ _ebay_cj = http.cookiejar.CookieJar()
 _ebay_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_ebay_cj))
 _ebay_browser_available = None  # None = untested, True/False after first attempt
 
+_EBAY_JUNK_TITLE = {
+    "new", "drop", "live", "restock", "in", "stock", "alert", "deal", "now",
+    "today", "limited", "wow", "everyone", "here", "update", "posted", "match",
+    "channel", "discord", "monitor", "keyword", "keywords", "post", "message",
+}
+
+_EBAY_CHROME_LINE = _re.compile(
+    r"^(?:"
+    r"(?:restock|drop|deal|live|stock)\s+alerts?"
+    r"|match\s+in\s+#?\S+"
+    r"|new\s+post\s+in\s+#?\S+"
+    r"|new\s+post"
+    r")$",
+    _re.I,
+)
+
+_EBAY_CHROME_PREFIX = _re.compile(
+    r"^(?:[\U0001F300-\U0001FAFF🚨🔔📬⚠✅❌◦]\s*)+"
+    r"|(?:restock|drop|deal|live|stock)\s+alerts?\s*[:\-–]?\s*"
+    r"|match\s+in\s+#?\S+\s*[:\-–]?\s*"
+    r"|new\s+post\s+in\s+#?\S+\s*[:\-–]?\s*",
+    _re.I,
+)
+
+
+def _is_ebay_chrome_title(text: str) -> bool:
+    t = (text or "").strip()
+    t = _re.sub(r"[\U0001F300-\U0001FAFF🚨🔔📬]", " ", t)
+    t = _re.sub(r"[#*_`|>]+", " ", t)
+    t = _re.sub(r"\s+", " ", t).strip().lower()
+    if not t:
+        return True
+    if _EBAY_CHROME_LINE.match(t):
+        return True
+    words = [w for w in t.split() if w not in _EBAY_JUNK_TITLE and len(w) > 1]
+    return len(words) == 0
+
+
+def _product_title_from_content(content: str) -> str:
+    """First real product line — never Discord/monitor chrome."""
+    skip_starts = (
+        "http", "<@", "```", "sku", "price", "offer", "seller", "order",
+        "add to", "links", "cart", "type", "asin", "quantity", "condition",
+    )
+    for line in (content or "").split("\n"):
+        clean = line.strip().lstrip("#").strip()
+        clean = _re.sub(r"<@!?&?\d+>", " ", clean)
+        clean = _re.sub(r"https?://\S+", " ", clean)
+        clean = _re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", clean)
+        for _ in range(3):
+            nxt = _EBAY_CHROME_PREFIX.sub("", clean).strip(" -–:|")
+            if nxt == clean:
+                break
+            clean = nxt
+        clean = _re.sub(r"\s+", " ", clean).strip(" -–:|")
+        if not clean:
+            continue
+        low = clean.lower()
+        if any(low.startswith(s) for s in skip_starts):
+            continue
+        if _is_ebay_chrome_title(clean):
+            continue
+        if len(clean) >= 4:
+            return clean[:120]
+    return ""
+
+
+def _ebay_search_url(query: str) -> str:
+    q = urllib.parse.quote_plus((query or "").strip()[:120])
+    return (f"https://www.ebay.com/sch/i.html?_nkw={q}"
+            "&LH_Complete=1&LH_Sold=1&_ipg=60&_sop=12")
+
+
+def _clean_ebay_query(title: str = "", asin: str = "", sku: str = "", content: str = "") -> str:
+    """Build an eBay sold-search string from product title + identifiers."""
+    import re as _re_clean
+    raw = (title or "").strip()
+    raw = _re_clean.sub(r"https?://\S+", " ", raw)
+    raw = _re_clean.sub(r"<@!?&?\d+>", " ", raw)
+    raw = _re_clean.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
+    raw = _EBAY_CHROME_PREFIX.sub("", raw)
+    raw = _re_clean.sub(r"[#*_`|>]+", " ", raw)
+    raw = _re_clean.sub(r"\s+", " ", raw).strip(" -–:")
+    if _is_ebay_chrome_title(raw) and content:
+        raw = _product_title_from_content(content) or raw
+    tokens = [t for t in raw.split(" ") if len(t) > 1 and t.lower() not in _EBAY_JUNK_TITLE]
+    asin = (asin or "").strip().upper()
+    sku = (sku or "").strip()
+    sku_is_asin = bool(_re_clean.match(r"^B0[A-Z0-9]{8}$", sku, _re_clean.I))
+    ident = asin if len(asin) == 10 else (sku if sku_is_asin else "")
+    extra_sku = sku if sku and not sku_is_asin and len(sku) >= 6 else ""
+    if _is_ebay_chrome_title(" ".join(tokens)):
+        tokens = []
+    if len(tokens) >= 2:
+        q = " ".join(tokens)[:120]
+        return q
+    if len(tokens) == 1 and len(tokens[0]) >= 4:
+        base = tokens[0]
+        if ident:
+            return f"{base} {ident}"[:120]
+        if extra_sku:
+            return f"{base} {extra_sku}"[:120]
+        return base[:120]
+    if ident:
+        return ident
+    if extra_sku:
+        return extra_sku
+    if content:
+        fallback = _product_title_from_content(content)
+        if fallback and not _is_ebay_chrome_title(fallback):
+            return fallback[:120]
+    return ""
+
+
+def _ebay_empty_result(query: str, error: str = "", blocked: bool = False) -> dict:
+    q = (query or "").strip()
+    url = _ebay_search_url(q) if q else "https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1"
+    out = {
+        "query": q, "prices": [], "avg": 0, "median": 0, "low": 0, "high": 0,
+        "count": 0, "fetched_at": datetime.now().isoformat(), "source": "ebay_sold",
+        "search_url": url, "manual_url": url, "blocked": blocked,
+        "note": "Open the eBay Sold link to check prices in your browser.",
+    }
+    if error:
+        out["error"] = error
+    return out
+
+
+def _find_ebay_browser() -> str:
+    """Installed Chrome/Edge/Chromium, then Playwright's cached Chromium."""
+    env = (os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH")
+           or os.environ.get("CHROME_PATH") or "").strip()
+    if env and Path(env).exists():
+        return env
+    named = [
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Microsoft/Edge/Application/msedge.exe",
+        Path("/usr/bin/google-chrome-stable"),
+        Path("/usr/bin/google-chrome"),
+        Path("/usr/local/bin/google-chrome"),
+        Path("/usr/bin/chromium"),
+        Path("/usr/bin/chromium-browser"),
+        Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+    ]
+    for p in named:
+        if p and str(p) != "." and p.exists():
+            return str(p)
+    chrome_paths = [
+        Path.home() / "AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe",
+        Path.home() / "AppData/Local/ms-playwright/chromium-1200/chrome-win64/chrome.exe",
+        Path.home() / ".cache/ms-playwright/chromium-1208/chrome-linux/chrome",
+        Path.home() / ".cache/ms-playwright/chromium-1200/chrome-linux/chrome",
+    ]
+    for p in chrome_paths:
+        if p.exists():
+            return str(p)
+    for base in [Path.home() / "AppData/Local/ms-playwright", Path.home() / ".cache/ms-playwright"]:
+        if not base.exists():
+            continue
+        for d in sorted(base.iterdir(), reverse=True):
+            if not d.name.startswith("chromium-"):
+                continue
+            for sub in ["chrome-win64/chrome.exe", "chrome-win/chrome.exe",
+                        "chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium"]:
+                candidate = d / sub
+                if candidate.exists():
+                    return str(candidate)
+    return ""
+
+
 def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
     """Extract prices from eBay sold listings HTML.  Returns result dict."""
+    query = (query or "").strip()
     result = {"query": query, "prices": [], "avg": 0, "median": 0,
               "low": 0, "high": 0, "count": 0, "fetched_at": datetime.now().isoformat(),
-              "source": "ebay_sold"}
+              "source": "ebay_sold", "search_url": _ebay_search_url(query),
+              "manual_url": _ebay_search_url(query)}
+
+    if not query:
+        result["error"] = "Empty eBay search query — no title, ASIN, or SKU"
+        return result
 
     if html is None:
-        encoded = urllib.parse.quote_plus(query[:120])
-        # _sop=12 = End date: recent first — recent sold items
-        url = (f"https://www.ebay.com/sch/i.html?_nkw={encoded}"
-               "&LH_Complete=1&LH_Sold=1&_ipg=120&rt=nc&_sop=12")
+        url = _ebay_search_url(query)
+        result["search_url"] = url
+        result["manual_url"] = url
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -536,9 +720,6 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
             "Accept-Encoding": "identity",
             "Referer": "https://www.ebay.com/",
             "DNT": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same_origin",
         }
         req = urllib.request.Request(url)
         for k, v in headers.items():
@@ -546,13 +727,32 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
         try:
             with _ebay_opener.open(req, timeout=15) as resp:
                 html = resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            code = getattr(e, "code", 0) or 0
+            result["error"] = f"eBay blocked automated scrape (HTTP {code} {e.reason})"
+            result["blocked"] = True
+            result["count"] = 0
+            result["note"] = "Open the eBay Sold link to check prices in your browser."
+            return result
         except Exception as e:
-            result["error"] = f"fetch failed: {e}"
+            result["error"] = f"eBay scrape failed: {e}"
+            result["blocked"] = True
+            result["count"] = 0
+            result["note"] = "Open the eBay Sold link to check prices in your browser."
             return result
 
-    # If we got a CAPTCHA page, mark as blocked
-    if "Pardon Our Interruption" in html[:500]:
+    # If we got a CAPTCHA page, mark as blocked — caller may try Playwright
+    head = (html or "")[:2000]
+    if ("Pardon Our Interruption" in head
+            or "captcha" in head.lower()
+            or "robot check" in head.lower()
+            or "blocked" in html[:800].lower() and "ebay" in html[:400].lower()):
         result["blocked"] = True
+        result["error"] = "eBay CAPTCHA / bot check — sold prices were not scraped"
+        result["count"] = 0
+        result["note"] = "Open the eBay Sold link to check prices in your browser."
+        result["search_url"] = _ebay_search_url(query)
+        result["manual_url"] = result["search_url"]
         return result
 
     prices = []
@@ -616,87 +816,96 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
 
 
 def _ebay_sold_browser(query: str) -> dict:
-    """Use Playwright headless browser to fetch eBay sold listings (bypasses bot detection)."""
+    """Use Playwright + installed Chrome/Chromium to fetch eBay sold listings."""
     global _ebay_browser_available
+    url = _ebay_search_url(query)
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         _ebay_browser_available = False
-        return {"error": "playwright not installed", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query}
+        return _ebay_empty_result(
+            query,
+            "Playwright is not installed — cannot scrape eBay in a browser",
+            blocked=True,
+        )
 
-    # Find a working Chromium binary from Playwright's cache
-    chrome_paths = [
-        Path.home() / "AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe",
-        Path.home() / "AppData/Local/ms-playwright/chromium-1200/chrome-win64/chrome.exe",
-        Path.home() / ".cache/ms-playwright/chromium-1208/chrome-linux/chrome",
-        Path.home() / ".cache/ms-playwright/chromium-1200/chrome-linux/chrome",
-    ]
-    chrome_exe = None
-    for p in chrome_paths:
-        if p.exists():
-            chrome_exe = str(p)
-            break
-    # Also scan for any chromium-* folder
-    if chrome_exe is None:
-        for base in [Path.home() / "AppData/Local/ms-playwright",
-                     Path.home() / ".cache/ms-playwright"]:
-            if base.exists():
-                for d in sorted(base.iterdir(), reverse=True):
-                    if d.name.startswith("chromium-"):
-                        for sub in ["chrome-win64/chrome.exe", "chrome-win/chrome.exe",
-                                    "chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium"]:
-                            candidate = d / sub
-                            if candidate.exists():
-                                chrome_exe = str(candidate)
-                                break
-                    if chrome_exe:
-                        break
-
-    if not chrome_exe:
-        _ebay_browser_available = False
-        return {"error": "No Chromium browser found for Playwright", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query}
-
+    chrome_exe = _find_ebay_browser()
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, executable_path=chrome_exe)
-            page = browser.new_page()
-            encoded = urllib.parse.quote_plus(query[:120])
-            url = (f"https://www.ebay.com/sch/i.html?_nkw={encoded}"
-                   "&LH_Complete=1&LH_Sold=1&_ipg=60&_sop=12")
-            page.goto(url, wait_until="domcontentloaded", timeout=15000)
-            page.wait_for_timeout(4000)  # Wait for JS rendering
-
-            html = page.page_source if hasattr(page, 'page_source') else page.content()
-            browser.close()
+            browser = None
+            last_err = None
+            launch_tries = []
+            if chrome_exe:
+                launch_tries.append({"headless": True, "executable_path": chrome_exe})
+            launch_tries.append({"headless": True, "channel": "chrome"})
+            launch_tries.append({"headless": True})
+            for kwargs in launch_tries:
+                try:
+                    browser = p.chromium.launch(**kwargs)
+                    break
+                except Exception as e:
+                    last_err = e
+                    browser = None
+            if browser is None:
+                _ebay_browser_available = False
+                return _ebay_empty_result(
+                    query,
+                    f"No Chromium/Chrome for Playwright ({last_err})",
+                    blocked=True,
+                )
+            try:
+                page = browser.new_page()
+                page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                page.wait_for_timeout(2500)
+                html = page.content()
+            finally:
+                browser.close()
 
         _ebay_browser_available = True
-        return _ebay_sold_prices_basic(query, html)
+        parsed = _ebay_sold_prices_basic(query, html)
+        parsed["search_url"] = url
+        parsed["manual_url"] = url
+        return parsed
     except Exception as e:
-        _ebay_browser_available = False
-        return {"error": f"browser fetch failed: {e}", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query}
+        return _ebay_empty_result(query, f"browser scrape timed out or failed: {e}", blocked=True)
 
 
 def _ebay_sold_prices(query: str) -> dict:
-    """Try basic HTTP first, fall back to browser automation if blocked."""
+    """HTTP scrape first; Playwright / Chrome if blocked or empty; always keep sold URL."""
+    query = (query or "").strip()
+    if not query:
+        return _ebay_empty_result("", "Empty eBay search query — no title, ASIN, or SKU")
+
     result = _ebay_sold_prices_basic(query)
+    result["query"] = query
+    result["search_url"] = result.get("search_url") or _ebay_search_url(query)
+    result["manual_url"] = result["search_url"]
 
-    # If basic fetch was blocked and browser automation is available, try that
-    if result.get("blocked") and _ebay_browser_available is not False:
-        add_log("info", f"🔄 eBay blocked basic request, trying browser for: {query[:50]}...")
-        result = _ebay_sold_browser(query)
-        if result.get("count", 0) > 0:
-            add_log("info", f"✅ Browser eBay lookup found {result['count']} prices")
+    need_browser = result.get("blocked") or result.get("count", 0) == 0
+    if need_browser:
+        add_log("info", f"🔄 eBay HTTP scrape missed prices ({result.get('error') or 'empty'}), trying browser for: {query[:50]}...")
+        browser_result = _ebay_sold_browser(query)
+        if browser_result.get("count", 0) > 0:
+            add_log("info", f"✅ Browser eBay lookup found {browser_result['count']} prices")
+            browser_result["query"] = query
+            browser_result["search_url"] = _ebay_search_url(query)
+            browser_result["manual_url"] = browser_result["search_url"]
+            return browser_result
+        err = browser_result.get("error") or result.get("error") or "eBay blocked the automated scrape"
+        http_err = result.get("error")
+        if http_err and browser_result.get("error") and http_err not in str(browser_result.get("error")):
+            err = f"{http_err}. {browser_result.get('error')}"
+        result = _ebay_empty_result(query, err, blocked=True)
+        add_log("warning", f"eBay sold lookup failed for '{query[:60]}': {err}")
 
-    # If still no results, return with helpful info
-    if result.get("count", 0) == 0 and not result.get("error"):
-        result["note"] = "No sold listings found or eBay blocked the request. Use the eBay Sold link to check manually."
-        result["fetched_at"] = datetime.now().isoformat()
-        result["manual_url"] = (f"https://www.ebay.com/sch/i.html?_nkw="
-                                f"{urllib.parse.quote_plus(query[:120])}"
-                                "&LH_Complete=1&LH_Sold=1&_sop=12")
+    if result.get("count", 0) == 0:
+        if not result.get("error"):
+            result["error"] = "No sold prices parsed for this search"
+        result["note"] = "Open the eBay Sold link to check prices in your browser."
+        result["fetched_at"] = result.get("fetched_at") or datetime.now().isoformat()
+        result["search_url"] = _ebay_search_url(query)
+        result["manual_url"] = result["search_url"]
+        result["query"] = query
 
     return result
 
@@ -1089,7 +1298,8 @@ def run_monitor(config: dict, stop_event: threading.Event):
     raw_channels = config.get("channels", [])
     channel_ids = []
     monitor_all_channels = set()  # Channels set to "all messages" mode
-    
+    skipped_config = []
+
     for c in raw_channels:
         try:
             # Handle both plain IDs (str/int) and {id, name, mode} objects
@@ -1101,9 +1311,12 @@ def run_monitor(config: dict, stop_event: threading.Event):
             else:
                 cid = c
             channel_ids.append(int(str(cid).strip()))
-        except (KeyError, ValueError, TypeError):
-            pass
+        except (KeyError, ValueError, TypeError) as e:
+            skipped_config.append(repr(c))
+            add_log("warning", f"⚠ Skipped invalid watched channel {c!r}: {e}")
     channel_id_set = set(channel_ids)  # for fast lookup and thread parent matching
+    if skipped_config:
+        add_log("warning", f"⚠ {len(skipped_config)} watched channel(s) skipped (bad id/mode): {', '.join(skipped_config)[:300]}")
     keywords = [k.lower().strip() for k in config.get("keywords", []) if k.strip()]
     ntfy_topic = config.get("ntfy_topic", "")
     ntfy_server = config.get("ntfy_server", "https://ntfy.sh")
@@ -1159,78 +1372,130 @@ def run_monitor(config: dict, stop_event: threading.Event):
                     parts.append(str(a.url))
             except Exception:
                 pass
+        for st in getattr(message, "stickers", []) or []:
+            try:
+                nm = getattr(st, "name", None)
+                if nm:
+                    parts.append(str(nm))
+            except Exception:
+                pass
         return "\n".join(p for p in parts if p).strip()
+
+    # Name lookup from config for log messages
+    ch_name_map = {}
+    for c in raw_channels:
+        if isinstance(c, dict):
+            try:
+                ch_name_map[int(str(c.get("id", "0")).strip())] = c.get("name", "")
+            except (ValueError, TypeError):
+                pass
+
+    async def _resolve_watched_channel(cid):
+        label = ch_name_map.get(cid, str(cid))
+        ch = client.get_channel(cid)
+        if ch is None:
+            last_err = None
+            for _try in range(3):
+                try:
+                    ch = await client.fetch_channel(cid)
+                    if ch is not None:
+                        break
+                except Exception as e:
+                    last_err = e
+                    ch = None
+                    await asyncio.sleep(0.4 * (_try + 1))
+            if ch is None:
+                add_log("warning", f"  ✗ #{label} ({cid}) — fetch failed: {last_err or 'not found'}")
+                return None, label, last_err or "not found"
+        return ch, label, None
+
+    async def _subscribe_watched_channels(reason="startup"):
+        """Lazy-guild: subscribe each guild, then OP-14 each watched channel. Never silent-skip."""
+        skipped = []
+        activated = 0
+        subscribed_guilds = set()
+        by_guild = {}
+        dms = []
+
+        for cid in channel_ids:
+            ch, label, err = await _resolve_watched_channel(cid)
+            if ch is None:
+                skipped.append(f"#{label} ({cid}): {err}")
+                continue
+            guild = getattr(ch, "guild", None)
+            if guild is None:
+                dms.append((cid, ch, label))
+                continue
+            by_guild.setdefault(guild.id, []).append((cid, ch, label))
+
+        async def _touch(ch, label, guild_name):
+            nonlocal activated
+            try:
+                async for _msg in ch.history(limit=1):
+                    break
+                activated += 1
+                add_log("info", f"  ✓ #{label} — {guild_name} — active")
+            except Exception as e:
+                add_log("warning", f"  ⚠ #{label} — {guild_name} — history touch failed (still subscribed): {e}")
+                activated += 1
+
+        for gid, items in by_guild.items():
+            guild = items[0][1].guild
+            guild_name = getattr(guild, "name", str(gid))
+            try:
+                await guild.subscribe(typing=True, threads=True, activities=True)
+                subscribed_guilds.add(gid)
+            except Exception as e:
+                add_log("warning", f"  ⚠ Guild subscribe failed for {guild_name}: {e}")
+                skipped.append(f"{guild_name}: subscribe {e}")
+
+            chan_ranges = {}
+            thread_objs = []
+            for cid, ch, label in items:
+                chan_ranges[str(cid)] = [(0, 99)]
+                parent_id = getattr(ch, "parent_id", None)
+                if parent_id:
+                    chan_ranges[str(int(parent_id))] = [(0, 99)]
+                if getattr(discord, "Thread", None) and isinstance(ch, discord.Thread):
+                    thread_objs.append(ch)
+
+            conn = getattr(client, "_connection", None) or getattr(client, "_state", None)
+            subs = getattr(conn, "subscriptions", None)
+            if subs and hasattr(subs, "subscribe_to_channels"):
+                try:
+                    await subs.subscribe_to_channels(guild, chan_ranges, replace=False)
+                except Exception as e:
+                    add_log("warning", f"  ⚠ Channel-map subscribe failed for {guild_name}: {e}")
+                    skipped.append(f"{guild_name}: channel map {e}")
+
+            if thread_objs:
+                try:
+                    await guild.subscribe_to(threads=thread_objs)
+                except Exception as e:
+                    add_log("warning", f"  ⚠ Thread subscribe failed for {guild_name}: {e}")
+
+            for cid, ch, label in items:
+                await _touch(ch, label, guild_name)
+                await asyncio.sleep(0.25)
+
+        for cid, ch, label in dms:
+            await _touch(ch, label, "DM")
+            await asyncio.sleep(0.25)
+
+        add_log(
+            "success" if not skipped else "warning",
+            f"📡 {reason}: {activated}/{len(channel_ids)} watched channels active, "
+            f"{len(subscribed_guilds)} guilds subscribed"
+            + (f" — SKIPPED: {'; '.join(skipped)[:500]}" if skipped else "")
+        )
+        return skipped
 
     @client.event
     async def on_ready():
         add_log("success", f"✅ Logged in as {client.user} — monitoring {len(channel_ids)} channels")
-        # Keep the original start timestamp set by /api/start for consistent uptime.
         if not state.get("start_time"):
             state["start_time"] = datetime.now().isoformat()
-
-        # ── Subscribe to guilds AND activate each channel ────────────────────
-        # Discord uses "lazy guilds" for user accounts. Simply connecting is NOT
-        # enough — we must subscribe to each guild, and then "touch" each channel
-        # by reading its recent history.  This tells the gateway to deliver
-        # on_message events for those channels.
-        subscribed_guild_ids = set()
-        resolved_channels = 0
-        activated_channels = 0
-        failed_channels = []
-
-        # Build a name lookup from config for nice log messages
-        ch_name_map = {}
-        for c in raw_channels:
-            if isinstance(c, dict):
-                ch_name_map[int(str(c.get("id", "0")).strip())] = c.get("name", "")
-
-        for cid in channel_ids:
-            label = ch_name_map.get(cid, str(cid))
-            ch = client.get_channel(cid)
-            if ch is None:
-                try:
-                    ch = await client.fetch_channel(cid)
-                except Exception as e:
-                    add_log("warning", f"  ✗ #{label} ({cid}) — fetch failed: {e}")
-                    failed_channels.append(label)
-                    continue
-            if ch is None:
-                add_log("warning", f"  ✗ #{label} ({cid}) — channel not found")
-                failed_channels.append(label)
-                continue
-
-            resolved_channels += 1
-            guild = getattr(ch, "guild", None)
-            guild_name = getattr(guild, "name", "DM") if guild else "DM"
-
-            # 1) Subscribe to the guild (once per guild)
-            if guild and getattr(guild, "id", None) not in subscribed_guild_ids:
-                try:
-                    await guild.subscribe()
-                    subscribed_guild_ids.add(guild.id)
-                except Exception:
-                    pass  # non-fatal, continue anyway
-
-            # 2) "Activate" the channel by reading its last message.
-            #    This tells Discord's gateway we are interested in this channel,
-            #    so it starts delivering on_message events for it.
-            try:
-                async for _msg in ch.history(limit=1):
-                    break  # just need to touch it
-                activated_channels += 1
-                add_log("info", f"  ✓ #{label} — {guild_name} — active")
-            except Exception as e:
-                # Even if history fails, the guild subscription may be enough
-                add_log("warning", f"  ⚠ #{label} — {guild_name} — could not activate: {e}")
-
-            # Small delay between channels to avoid rate-limiting
-            await asyncio.sleep(0.5)
-
-        add_log(
-            "success" if not failed_channels else "warning",
-            f"📡 Channels: {activated_channels}/{len(channel_ids)} active, {len(subscribed_guild_ids)} guilds subscribed"
-            + (f" — FAILED: {', '.join(failed_channels)}" if failed_channels else "")
-        )
+        await _subscribe_watched_channels("startup")
 
     @client.event
     async def on_message(message):
@@ -1276,7 +1541,9 @@ def run_monitor(config: dict, stop_event: threading.Event):
             return
 
         now = time.time()
-        fresh = [kw for kw in matched if now - cooldowns.get(kw, 0) >= cooldown_secs]
+        # Cooldown is per watched channel + keyword so a busy channel cannot mute the rest.
+        fresh = [kw for kw in matched
+                 if now - cooldowns.get(f"{effective_channel_id}:{kw}", 0) >= cooldown_secs]
         
         # For monitor-all channels, always alert (bypass cooldown for non-keyword matches)
         if not fresh and not is_monitor_all:
@@ -1284,7 +1551,7 @@ def run_monitor(config: dict, stop_event: threading.Event):
 
         # Update cooldowns only for keyword matches
         for kw in fresh:
-            cooldowns[kw] = now
+            cooldowns[f"{effective_channel_id}:{kw}"] = now
 
         channel_name = getattr(message.channel, "name", "unknown")
         guild_name = getattr(message.guild, "name", "Unknown Server") if message.guild else "DM"
@@ -1377,6 +1644,8 @@ def run_monitor(config: dict, stop_event: threading.Event):
             prefix = "🚨" if alert_priority == "high" else "🔔"
             log_msg = f"{prefix} Match in #{channel_name}"
 
+        product_title = _product_title_from_content(msg_text)
+
         add_log("alert", log_msg, {
             "server": guild_name,
             "channel": channel_name,
@@ -1384,11 +1653,13 @@ def run_monitor(config: dict, stop_event: threading.Event):
             "keywords": fresh if fresh else ["[monitor all]"],
             "content": msg_text[:3000],
             "raw_content": raw_content[:800],
+            "product_title": product_title,
             "jump_url": jump_url,
             "timestamp": datetime.now().isoformat(),
             "monitor_mode": "all" if is_monitor_all else "keywords",
             "message_id": str(getattr(message, "id", "")),
             "channel_id": str(getattr(message.channel, "id", "")),
+            "watch_channel_id": str(effective_channel_id),
             "parent_channel_id": str(parent_id) if parent_id is not None else None,
             "created_at": str(getattr(message, "created_at", "")) if getattr(message, "created_at", None) else None,
             "attachments": attachments[:10],
@@ -1476,20 +1747,10 @@ def run_monitor(config: dict, stop_event: threading.Event):
             # Every 10 minutes, re-activate channels to keep subscriptions fresh
             cycles += 1
             if cycles % 10 == 0:
-                reactivated = 0
-                for cid in channel_ids:
-                    try:
-                        ch = client.get_channel(cid)
-                        if ch is None:
-                            ch = await client.fetch_channel(cid)
-                        if ch:
-                            async for _ in ch.history(limit=1):
-                                break
-                            reactivated += 1
-                    except Exception:
-                        pass
-                    await asyncio.sleep(0.3)
-                add_log("info", f"🔄 Re-activated {reactivated}/{len(channel_ids)} channels")
+                try:
+                    await _subscribe_watched_channels("re-activate")
+                except Exception as e:
+                    add_log("warning", f"🔄 Re-activate failed: {e}")
 
             await asyncio.sleep(60)
 
@@ -1688,7 +1949,8 @@ class Handler(BaseHTTPRequestHandler):
             logs = state["logs"]
             if since_id:
                 logs = [l for l in logs if l["id"] > since_id]
-            self.send_json({"logs": logs, "alert_count": state["alert_count"]})
+            self.send_json({"logs": logs, "alert_count": state["alert_count"],
+                            "alerts": state.get("recent_alerts") or []})
 
         elif path == "/api/stats":
             stats = state.get("stats", {})
@@ -1859,15 +2121,34 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/ebay-lookup":
             try:
                 data = json.loads(self.read_body())
-                query = (data.get("query") or "").strip()
+                title = (data.get("title") or data.get("query") or "").strip()
+                asin = (data.get("asin") or "").strip()
+                sku = (data.get("sku") or "").strip()
+                content = (data.get("content") or "").strip()
+                query = _clean_ebay_query(title, asin=asin, sku=sku, content=content)
                 if not query:
-                    self.send_json({"error": "No query"}, 400)
+                    self.send_json({
+                        "error": "No product title, ASIN, or SKU to search on eBay",
+                        "query": "",
+                        "count": 0,
+                        "prices": [],
+                        "search_url": "https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1",
+                    }, 400)
                     return
-                # Run in thread to avoid blocking server
                 result = _ebay_sold_prices(query)
+                result["query"] = query
+                if not result.get("search_url"):
+                    result["search_url"] = _ebay_search_url(query)
+                result["manual_url"] = result["search_url"]
                 self.send_json(result)
             except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+                q = ""
+                try:
+                    q = query
+                except NameError:
+                    pass
+                fail = _ebay_empty_result(q, f"eBay lookup crashed: {e}", blocked=True)
+                self.send_json(fail, 500)
 
         elif path == "/api/sync/configure":
             try:
@@ -2045,6 +2326,114 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
 
+        elif path == "/api/test_alert":
+            # Seed demo alerts for Dashboard / UI checks. Does not touch the Discord gateway.
+            try:
+                now = datetime.now()
+                samples = [
+                    {
+                        "message": "🚨 Match in #amazon-restocks",
+                        "details": {
+                            "server": "Flip Alerts",
+                            "channel": "amazon-restocks",
+                            "author": "RestockBot",
+                            "keywords": ["pokemon", "restock"],
+                            "content": (
+                                "Pokemon TCG Prismatic Evolutions Elite Trainer Box\n"
+                                "SKU\nB0DH1ZW4MM\n"
+                                "Price\n$54.99\n"
+                                "Seller\nAmazon.com\n"
+                                "Add to Cart\n"
+                                "[Add to Cart](https://www.amazon.com/checkout/entry/buynow?asin=B0DH1ZW4MM)\n"
+                                "Links\n"
+                                "[Amazon](https://www.amazon.com/dp/B0DH1ZW4MM) [eBay](https://www.ebay.com/sch/i.html?_nkw=prismatic+evolutions+etb)"
+                            ),
+                            "jump_url": "https://discord.com/channels/1/2/3",
+                            "timestamp": now.isoformat(),
+                            "created_at": now.isoformat(),
+                            "image_urls": ["https://m.media-amazon.com/images/I/81Q7rGaLYdL._AC_SL1500_.jpg"],
+                            "links": ["https://www.amazon.com/dp/B0DH1ZW4MM"],
+                            "priority": "high",
+                            "asin": "B0DH1ZW4MM",
+                            "product_title": "Pokemon TCG Prismatic Evolutions Elite Trainer Box",
+                        },
+                    },
+                    {
+                        "message": "🔔 Match in #target-drops",
+                        "details": {
+                            "server": "Flip Alerts",
+                            "channel": "target-drops",
+                            "author": "DropPing",
+                            "keywords": ["hot wheels"],
+                            "content": (
+                                "# Restock Alert\n"
+                                "Hot Wheels Premium Boulevard Mix\n"
+                                "Just hit Target online — limited per household.\n"
+                                "[ATC](https://www.target.com/p/hot-wheels/-/A-12345678)\n"
+                                "https://www.target.com/p/hot-wheels/-/A-12345678"
+                            ),
+                            "jump_url": "https://discord.com/channels/1/4/5",
+                            "timestamp": (now - timedelta(minutes=2)).isoformat(),
+                            "created_at": (now - timedelta(minutes=2)).isoformat(),
+                            "image_urls": ["https://target.scene7.com/is/image/Target/GUEST_hotwheels"],
+                            "links": ["https://www.target.com/p/hot-wheels/-/A-12345678"],
+                            "priority": "medium",
+                        },
+                    },
+                    {
+                        "message": "🔔 Match in #walmart-deals",
+                        "details": {
+                            "server": "Flip Alerts",
+                            "channel": "walmart-deals",
+                            "author": "Scout",
+                            "keywords": ["lego"],
+                            "content": (
+                                "LEGO Star Wars UCS set clearance\n"
+                                "Price\n$89.00\n"
+                                "Recommended Price\n$159.99\n"
+                                "Links\n"
+                                "[Walmart](https://www.walmart.com/ip/lego-star-wars/123456789) [eBay Sold](https://www.ebay.com/sch/i.html?_nkw=lego+star+wars+ucs&LH_Sold=1)"
+                            ),
+                            "jump_url": "https://discord.com/channels/1/6/7",
+                            "timestamp": (now - timedelta(minutes=8)).isoformat(),
+                            "created_at": (now - timedelta(minutes=8)).isoformat(),
+                            "image_urls": [],
+                            "links": ["https://www.walmart.com/ip/lego-star-wars/123456789"],
+                            "priority": "medium",
+                        },
+                    },
+                    {
+                        "message": "📬 New post in #exclusive",
+                        "details": {
+                            "server": "VIP Drops",
+                            "channel": "exclusive",
+                            "author": "mod",
+                            "keywords": ["[monitor all]"],
+                            "content": (
+                                "Monster High Haunt Couture restock rumor — watch the product page.\n"
+                                "https://www.amazon.com/dp/B0CXYZ1234"
+                            ),
+                            "jump_url": "https://discord.com/channels/8/9/10",
+                            "timestamp": (now - timedelta(minutes=18)).isoformat(),
+                            "created_at": (now - timedelta(minutes=18)).isoformat(),
+                            "image_urls": [],
+                            "links": ["https://www.amazon.com/dp/B0CXYZ1234"],
+                            "priority": "low",
+                            "asin": "B0CXYZ1234",
+                        },
+                    },
+                ]
+                last = None
+                for s in samples:
+                    d = s["details"]
+                    d["product_title"] = d.get("product_title") or _product_title_from_content(d.get("content") or "")
+                    last = add_log("alert", s["message"], d)
+                    state["alert_count"] += 1
+                    state["last_alert_at"] = datetime.now().isoformat()
+                self.send_json({"ok": True, "count": len(samples), "alert": last})
+            except Exception as e:
+                self.send_json({"error": str(e)}, 400)
+
         elif path == "/api/test_ntfy":
             try:
                 data = json.loads(self.read_body())
@@ -2126,7 +2515,7 @@ PORT = 7890
 
 def main():
     print("=" * 55)
-    print("  Drop Scout — Starting...")
+    print("  Drop Scout 2.0 - Dashboard")
     print(f"  UI: http://localhost:{PORT}")
     print("  Press Ctrl+C to stop.")
     print("=" * 55)
@@ -2164,10 +2553,7 @@ def main():
     try:
         server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     except OSError as e:
-        print(f"\n  ❌ ERROR: Port {PORT} is already in use!")
-        print(f"     Another instance of Drop Scout (or DropScout.exe) may be running.")
-        print(f"     Close it first, or run:  taskkill /F /IM DropScout.exe")
-        input("\n  Press Enter to exit...")
+        print(f"ERROR: port {PORT} already in use. Close the other Drop Scout window and retry. ({e})")
         sys.exit(1)
     server.timeout = 1
 
@@ -2175,7 +2561,7 @@ def main():
     def open_browser():
         time.sleep(0.8)
         # Cache-bust on launch so users don't need Ctrl+F5 to get latest UI logic.
-        webbrowser.open(f"http://localhost:{PORT}/?v={int(time.time())}")
+        webbrowser.open(f"http://localhost:{PORT}/?v=2.0.{int(time.time())}")
     threading.Thread(target=open_browser, daemon=True).start()
 
     add_log("success", f"✅ Server started on http://localhost:{PORT}")
