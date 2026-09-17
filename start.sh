@@ -26,7 +26,7 @@ if [ $? -ne 0 ]; then
     fi
 fi
 
-# Do not pkill here — a stuck process table wait must never block launch.
+# Do not pkill here - a stuck process table wait must never block launch.
 # discord_monitor_server.py exits immediately if port 7890 is already bound.
 
 echo "  Starting Drop Scout 2.0 (dashboard UI)..."
