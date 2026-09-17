@@ -2677,6 +2677,7 @@ const S = {
   filter: 'alert',
   searchQuery: '',
   logs: [],
+  liveAlerts: [],
   channels: [],
   keywords: [],
   config: {},
@@ -2684,6 +2685,7 @@ const S = {
   startTime: null,
   manualStarted: false,
   lastTopId: 0,
+  lastWallId: 0,
   lastPollOk: 0,
   soundEnabled: true,
   notifsEnabled: true,
@@ -3125,10 +3127,29 @@ function retailerEmoji(drop) {
   return '📦';
 }
 
+function liveDropAlerts(source, cap) {
+  cap = cap || 24;
+  const alerts = (source || []).filter(l => l && l.level === 'alert' && l.details);
+  const featured = [];
+  const extra = [];
+  const seen = new Set();
+  for (const a of alerts) {
+    const d = a.details || {};
+    const key = String(d.watch_channel_id || d.parent_channel_id || d.channel_id || d.channel || a.id);
+    if (!seen.has(key)) {
+      seen.add(key);
+      featured.push(a);
+    } else {
+      extra.push(a);
+    }
+  }
+  return featured.concat(extra).slice(0, cap);
+}
+
 function renderDashboard() {
   const grid = document.getElementById('dash-grid');
   if (!grid) return;
-  const alerts = S.logs.filter(l => l && l.level === 'alert' && l.details).slice(0, 24);
+  const alerts = liveDropAlerts(S.liveAlerts && S.liveAlerts.length ? S.liveAlerts : S.logs, 24);
   if (!alerts.length) {
     grid.innerHTML = `<div class="dash-empty" style="grid-column:1/-1">
       <h2>Waiting for drops</h2>
@@ -3531,12 +3552,16 @@ async function pollOnce() {
 
     // Logs — only rebuild when data actually changes
     const logs = Array.isArray(logData.logs) ? logData.logs : [];
+    const wall = Array.isArray(logData.alerts) ? logData.alerts : logs;
     const newTopId = logs.length ? logs[0].id : 0;
+    const wallTop = wall.length ? wall[0].id : 0;
     const newCount = typeof logData.alert_count === 'number' ? logData.alert_count : (statusData.alert_count || 0);
 
-    if (newTopId !== S.lastTopId || newCount !== S.alertCount) {
+    if (newTopId !== S.lastTopId || newCount !== S.alertCount || wallTop !== S.lastWallId) {
       S.logs = logs;
+      S.liveAlerts = wall;
       S.lastTopId = newTopId;
+      S.lastWallId = wallTop;
       updateAlertCount(newCount);
       // Rebuild only the visible surface so the alert path stays cheap.
       if (S.activeView === 'dashboard') renderDashboard();
@@ -4062,13 +4087,17 @@ async function loadAll() {
     const logData = await api.get('/api/logs');
     const initLogs = Array.isArray(logData.logs) ? logData.logs : [];
     S.logs = initLogs;
+    S.liveAlerts = Array.isArray(logData.alerts) ? logData.alerts : initLogs.filter(l => l.level === 'alert');
     S.lastTopId = initLogs.length ? initLogs[0].id : 0;
+    S.lastWallId = S.liveAlerts.length ? S.liveAlerts[0].id : 0;
     updateAlertCount(logData.alert_count || 0);
     if (new URLSearchParams(location.search).has('demo') && !S.logs.some(l => l.level === 'alert')) {
       await api.post('/api/test_alert', {});
       const seeded = await api.get('/api/logs');
       S.logs = Array.isArray(seeded.logs) ? seeded.logs : S.logs;
+      S.liveAlerts = Array.isArray(seeded.alerts) ? seeded.alerts : S.logs.filter(l => l.level === 'alert');
       S.lastTopId = S.logs.length ? S.logs[0].id : 0;
+      S.lastWallId = S.liveAlerts.length ? S.liveAlerts[0].id : 0;
       updateAlertCount(seeded.alert_count || S.alertCount);
     }
     renderDashboard();
@@ -5037,7 +5066,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-clear-logs').addEventListener('click', async () => {
     await api.post('/api/logs/clear', {});
     S.logs = [];
+    S.liveAlerts = [];
     S.lastTopId = 0;
+    S.lastWallId = 0;
     S.alertCount = 0;
     rebuildLogs();
     updateAlertCount(0);

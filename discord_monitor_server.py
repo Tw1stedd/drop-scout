@@ -78,6 +78,7 @@ def save_config(config):
 state = {
     "running": False,
     "logs": [],          # list of log dicts
+    "recent_alerts": [],  # last N alerts only (Live Drops; not mixed with heartbeats)
     "alert_count": 0,
     "start_time": None,
     "monitor_thread": None,
@@ -305,6 +306,8 @@ def load_alert_history():
                     ch = details.get("channel", "")
                     if ch:
                         state["stats"]["channel_hits"][ch] = state["stats"]["channel_hits"].get(ch, 0) + 1
+                hist_alerts = [e for e in reversed(state["alert_history"]) if e.get("level") == "alert"]
+                state["recent_alerts"] = hist_alerts[:80]
         except Exception:
             pass
 
@@ -340,6 +343,9 @@ def add_log(level: str, message: str, details: dict = None):
 
     # Persist alerts to history + update stats
     if level == "alert" and details:
+        state["recent_alerts"].insert(0, entry)
+        if len(state["recent_alerts"]) > 80:
+            state["recent_alerts"] = state["recent_alerts"][:80]
         state["alert_history"].append(entry)
         if len(state["alert_history"]) > 5000:
             state["alert_history"] = state["alert_history"][-5000:]
@@ -1220,7 +1226,8 @@ def run_monitor(config: dict, stop_event: threading.Event):
     raw_channels = config.get("channels", [])
     channel_ids = []
     monitor_all_channels = set()  # Channels set to "all messages" mode
-    
+    skipped_config = []
+
     for c in raw_channels:
         try:
             # Handle both plain IDs (str/int) and {id, name, mode} objects
@@ -1232,9 +1239,12 @@ def run_monitor(config: dict, stop_event: threading.Event):
             else:
                 cid = c
             channel_ids.append(int(str(cid).strip()))
-        except (KeyError, ValueError, TypeError):
-            pass
+        except (KeyError, ValueError, TypeError) as e:
+            skipped_config.append(repr(c))
+            add_log("warning", f"⚠ Skipped invalid watched channel {c!r}: {e}")
     channel_id_set = set(channel_ids)  # for fast lookup and thread parent matching
+    if skipped_config:
+        add_log("warning", f"⚠ {len(skipped_config)} watched channel(s) skipped (bad id/mode): {', '.join(skipped_config)[:300]}")
     keywords = [k.lower().strip() for k in config.get("keywords", []) if k.strip()]
     ntfy_topic = config.get("ntfy_topic", "")
     ntfy_server = config.get("ntfy_server", "https://ntfy.sh")
@@ -1290,78 +1300,130 @@ def run_monitor(config: dict, stop_event: threading.Event):
                     parts.append(str(a.url))
             except Exception:
                 pass
+        for st in getattr(message, "stickers", []) or []:
+            try:
+                nm = getattr(st, "name", None)
+                if nm:
+                    parts.append(str(nm))
+            except Exception:
+                pass
         return "\n".join(p for p in parts if p).strip()
+
+    # Name lookup from config for log messages
+    ch_name_map = {}
+    for c in raw_channels:
+        if isinstance(c, dict):
+            try:
+                ch_name_map[int(str(c.get("id", "0")).strip())] = c.get("name", "")
+            except (ValueError, TypeError):
+                pass
+
+    async def _resolve_watched_channel(cid):
+        label = ch_name_map.get(cid, str(cid))
+        ch = client.get_channel(cid)
+        if ch is None:
+            last_err = None
+            for _try in range(3):
+                try:
+                    ch = await client.fetch_channel(cid)
+                    if ch is not None:
+                        break
+                except Exception as e:
+                    last_err = e
+                    ch = None
+                    await asyncio.sleep(0.4 * (_try + 1))
+            if ch is None:
+                add_log("warning", f"  ✗ #{label} ({cid}) — fetch failed: {last_err or 'not found'}")
+                return None, label, last_err or "not found"
+        return ch, label, None
+
+    async def _subscribe_watched_channels(reason="startup"):
+        """Lazy-guild: subscribe each guild, then OP-14 each watched channel. Never silent-skip."""
+        skipped = []
+        activated = 0
+        subscribed_guilds = set()
+        by_guild = {}
+        dms = []
+
+        for cid in channel_ids:
+            ch, label, err = await _resolve_watched_channel(cid)
+            if ch is None:
+                skipped.append(f"#{label} ({cid}): {err}")
+                continue
+            guild = getattr(ch, "guild", None)
+            if guild is None:
+                dms.append((cid, ch, label))
+                continue
+            by_guild.setdefault(guild.id, []).append((cid, ch, label))
+
+        async def _touch(ch, label, guild_name):
+            nonlocal activated
+            try:
+                async for _msg in ch.history(limit=1):
+                    break
+                activated += 1
+                add_log("info", f"  ✓ #{label} — {guild_name} — active")
+            except Exception as e:
+                add_log("warning", f"  ⚠ #{label} — {guild_name} — history touch failed (still subscribed): {e}")
+                activated += 1
+
+        for gid, items in by_guild.items():
+            guild = items[0][1].guild
+            guild_name = getattr(guild, "name", str(gid))
+            try:
+                await guild.subscribe(typing=True, threads=True, activities=True)
+                subscribed_guilds.add(gid)
+            except Exception as e:
+                add_log("warning", f"  ⚠ Guild subscribe failed for {guild_name}: {e}")
+                skipped.append(f"{guild_name}: subscribe {e}")
+
+            chan_ranges = {}
+            thread_objs = []
+            for cid, ch, label in items:
+                chan_ranges[str(cid)] = [(0, 99)]
+                parent_id = getattr(ch, "parent_id", None)
+                if parent_id:
+                    chan_ranges[str(int(parent_id))] = [(0, 99)]
+                if getattr(discord, "Thread", None) and isinstance(ch, discord.Thread):
+                    thread_objs.append(ch)
+
+            conn = getattr(client, "_connection", None) or getattr(client, "_state", None)
+            subs = getattr(conn, "subscriptions", None)
+            if subs and hasattr(subs, "subscribe_to_channels"):
+                try:
+                    await subs.subscribe_to_channels(guild, chan_ranges, replace=False)
+                except Exception as e:
+                    add_log("warning", f"  ⚠ Channel-map subscribe failed for {guild_name}: {e}")
+                    skipped.append(f"{guild_name}: channel map {e}")
+
+            if thread_objs:
+                try:
+                    await guild.subscribe_to(threads=thread_objs)
+                except Exception as e:
+                    add_log("warning", f"  ⚠ Thread subscribe failed for {guild_name}: {e}")
+
+            for cid, ch, label in items:
+                await _touch(ch, label, guild_name)
+                await asyncio.sleep(0.25)
+
+        for cid, ch, label in dms:
+            await _touch(ch, label, "DM")
+            await asyncio.sleep(0.25)
+
+        add_log(
+            "success" if not skipped else "warning",
+            f"📡 {reason}: {activated}/{len(channel_ids)} watched channels active, "
+            f"{len(subscribed_guilds)} guilds subscribed"
+            + (f" — SKIPPED: {'; '.join(skipped)[:500]}" if skipped else "")
+        )
+        return skipped
 
     @client.event
     async def on_ready():
         add_log("success", f"✅ Logged in as {client.user} — monitoring {len(channel_ids)} channels")
-        # Keep the original start timestamp set by /api/start for consistent uptime.
         if not state.get("start_time"):
             state["start_time"] = datetime.now().isoformat()
-
-        # ── Subscribe to guilds AND activate each channel ────────────────────
-        # Discord uses "lazy guilds" for user accounts. Simply connecting is NOT
-        # enough — we must subscribe to each guild, and then "touch" each channel
-        # by reading its recent history.  This tells the gateway to deliver
-        # on_message events for those channels.
-        subscribed_guild_ids = set()
-        resolved_channels = 0
-        activated_channels = 0
-        failed_channels = []
-
-        # Build a name lookup from config for nice log messages
-        ch_name_map = {}
-        for c in raw_channels:
-            if isinstance(c, dict):
-                ch_name_map[int(str(c.get("id", "0")).strip())] = c.get("name", "")
-
-        for cid in channel_ids:
-            label = ch_name_map.get(cid, str(cid))
-            ch = client.get_channel(cid)
-            if ch is None:
-                try:
-                    ch = await client.fetch_channel(cid)
-                except Exception as e:
-                    add_log("warning", f"  ✗ #{label} ({cid}) — fetch failed: {e}")
-                    failed_channels.append(label)
-                    continue
-            if ch is None:
-                add_log("warning", f"  ✗ #{label} ({cid}) — channel not found")
-                failed_channels.append(label)
-                continue
-
-            resolved_channels += 1
-            guild = getattr(ch, "guild", None)
-            guild_name = getattr(guild, "name", "DM") if guild else "DM"
-
-            # 1) Subscribe to the guild (once per guild)
-            if guild and getattr(guild, "id", None) not in subscribed_guild_ids:
-                try:
-                    await guild.subscribe()
-                    subscribed_guild_ids.add(guild.id)
-                except Exception:
-                    pass  # non-fatal, continue anyway
-
-            # 2) "Activate" the channel by reading its last message.
-            #    This tells Discord's gateway we are interested in this channel,
-            #    so it starts delivering on_message events for it.
-            try:
-                async for _msg in ch.history(limit=1):
-                    break  # just need to touch it
-                activated_channels += 1
-                add_log("info", f"  ✓ #{label} — {guild_name} — active")
-            except Exception as e:
-                # Even if history fails, the guild subscription may be enough
-                add_log("warning", f"  ⚠ #{label} — {guild_name} — could not activate: {e}")
-
-            # Small delay between channels to avoid rate-limiting
-            await asyncio.sleep(0.5)
-
-        add_log(
-            "success" if not failed_channels else "warning",
-            f"📡 Channels: {activated_channels}/{len(channel_ids)} active, {len(subscribed_guild_ids)} guilds subscribed"
-            + (f" — FAILED: {', '.join(failed_channels)}" if failed_channels else "")
-        )
+        await _subscribe_watched_channels("startup")
 
     @client.event
     async def on_message(message):
@@ -1407,7 +1469,9 @@ def run_monitor(config: dict, stop_event: threading.Event):
             return
 
         now = time.time()
-        fresh = [kw for kw in matched if now - cooldowns.get(kw, 0) >= cooldown_secs]
+        # Cooldown is per watched channel + keyword so a busy channel cannot mute the rest.
+        fresh = [kw for kw in matched
+                 if now - cooldowns.get(f"{effective_channel_id}:{kw}", 0) >= cooldown_secs]
         
         # For monitor-all channels, always alert (bypass cooldown for non-keyword matches)
         if not fresh and not is_monitor_all:
@@ -1415,7 +1479,7 @@ def run_monitor(config: dict, stop_event: threading.Event):
 
         # Update cooldowns only for keyword matches
         for kw in fresh:
-            cooldowns[kw] = now
+            cooldowns[f"{effective_channel_id}:{kw}"] = now
 
         channel_name = getattr(message.channel, "name", "unknown")
         guild_name = getattr(message.guild, "name", "Unknown Server") if message.guild else "DM"
@@ -1520,6 +1584,7 @@ def run_monitor(config: dict, stop_event: threading.Event):
             "monitor_mode": "all" if is_monitor_all else "keywords",
             "message_id": str(getattr(message, "id", "")),
             "channel_id": str(getattr(message.channel, "id", "")),
+            "watch_channel_id": str(effective_channel_id),
             "parent_channel_id": str(parent_id) if parent_id is not None else None,
             "created_at": str(getattr(message, "created_at", "")) if getattr(message, "created_at", None) else None,
             "attachments": attachments[:10],
@@ -1607,20 +1672,10 @@ def run_monitor(config: dict, stop_event: threading.Event):
             # Every 10 minutes, re-activate channels to keep subscriptions fresh
             cycles += 1
             if cycles % 10 == 0:
-                reactivated = 0
-                for cid in channel_ids:
-                    try:
-                        ch = client.get_channel(cid)
-                        if ch is None:
-                            ch = await client.fetch_channel(cid)
-                        if ch:
-                            async for _ in ch.history(limit=1):
-                                break
-                            reactivated += 1
-                    except Exception:
-                        pass
-                    await asyncio.sleep(0.3)
-                add_log("info", f"🔄 Re-activated {reactivated}/{len(channel_ids)} channels")
+                try:
+                    await _subscribe_watched_channels("re-activate")
+                except Exception as e:
+                    add_log("warning", f"🔄 Re-activate failed: {e}")
 
             await asyncio.sleep(60)
 
@@ -1819,7 +1874,8 @@ class Handler(BaseHTTPRequestHandler):
             logs = state["logs"]
             if since_id:
                 logs = [l for l in logs if l["id"] > since_id]
-            self.send_json({"logs": logs, "alert_count": state["alert_count"]})
+            self.send_json({"logs": logs, "alert_count": state["alert_count"],
+                            "alerts": state.get("recent_alerts") or []})
 
         elif path == "/api/stats":
             stats = state.get("stats", {})
