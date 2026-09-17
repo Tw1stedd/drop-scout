@@ -4284,7 +4284,21 @@ async function loadDeals() {
 
 const EBAY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
-async function ebayLookup(deal, forceRefresh = false) {
+function openEbaySoldTab(url) {
+  if (!url) return;
+  let opened = null;
+  try { opened = window.open(url, '_blank', 'noopener,noreferrer'); } catch (_) {}
+  if (opened) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function ebayLookup(deal, forceRefresh = false, openOnFail = false) {
   const built = buildEbaySoldQuery(deal);
   if (!forceRefresh && deal.ebayData && deal.ebayData.count > 0) {
     const fetchedAt = deal.ebayData.fetched_at ? new Date(deal.ebayData.fetched_at).getTime() : 0;
@@ -4313,6 +4327,9 @@ async function ebayLookup(deal, forceRefresh = false) {
     packed.manual_url = packed.search_url;
     deal.ebayData = packed;
     _dealsState.ebayCache[deal.key] = packed;
+    if (!(packed.count > 0) && openOnFail) {
+      openEbaySoldTab(packed.search_url || built.soldUrl);
+    }
     return packed;
   } catch (e) {
     const fail = {
@@ -4322,6 +4339,7 @@ async function ebayLookup(deal, forceRefresh = false) {
     };
     deal.ebayData = fail;
     _dealsState.ebayCache[deal.key] = fail;
+    if (openOnFail) openEbaySoldTab(built.soldUrl);
     return fail;
   }
 }
@@ -5582,11 +5600,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!deal) return;
     btn.disabled = true;
     btn.textContent = '⏳ Looking up...';
-    await ebayLookup(deal);
+    await ebayLookup(deal, false, true);
     if (deal.ebayData && deal.ebayData.count > 0) {
       toast(`eBay sold: ${deal.ebayData.query} → $${deal.ebayData.median}`, 'success', 2500);
     } else {
-      toast((deal.ebayData && (deal.ebayData.error || deal.ebayData.note)) || 'eBay lookup failed', 'error', 4500);
+      const why = (deal.ebayData && (deal.ebayData.error || deal.ebayData.note)) || 'eBay lookup failed';
+      toast(why, 'error', 5000);
     }
     renderDeals();
   }, true);

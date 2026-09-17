@@ -559,23 +559,80 @@ def _clean_ebay_query(title: str = "", asin: str = "", sku: str = "") -> str:
     return raw[:120]
 
 
+def _ebay_empty_result(query: str, error: str = "", blocked: bool = False) -> dict:
+    q = (query or "").strip()
+    url = _ebay_search_url(q) if q else "https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1"
+    out = {
+        "query": q, "prices": [], "avg": 0, "median": 0, "low": 0, "high": 0,
+        "count": 0, "fetched_at": datetime.now().isoformat(), "source": "ebay_sold",
+        "search_url": url, "manual_url": url, "blocked": blocked,
+        "note": "Open the eBay Sold link to check prices in your browser.",
+    }
+    if error:
+        out["error"] = error
+    return out
+
+
+def _find_ebay_browser() -> str:
+    """Installed Chrome/Edge/Chromium, then Playwright's cached Chromium."""
+    env = (os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH")
+           or os.environ.get("CHROME_PATH") or "").strip()
+    if env and Path(env).exists():
+        return env
+    named = [
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Microsoft/Edge/Application/msedge.exe",
+        Path("/usr/bin/google-chrome-stable"),
+        Path("/usr/bin/google-chrome"),
+        Path("/usr/local/bin/google-chrome"),
+        Path("/usr/bin/chromium"),
+        Path("/usr/bin/chromium-browser"),
+        Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+    ]
+    for p in named:
+        if p and str(p) != "." and p.exists():
+            return str(p)
+    chrome_paths = [
+        Path.home() / "AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe",
+        Path.home() / "AppData/Local/ms-playwright/chromium-1200/chrome-win64/chrome.exe",
+        Path.home() / ".cache/ms-playwright/chromium-1208/chrome-linux/chrome",
+        Path.home() / ".cache/ms-playwright/chromium-1200/chrome-linux/chrome",
+    ]
+    for p in chrome_paths:
+        if p.exists():
+            return str(p)
+    for base in [Path.home() / "AppData/Local/ms-playwright", Path.home() / ".cache/ms-playwright"]:
+        if not base.exists():
+            continue
+        for d in sorted(base.iterdir(), reverse=True):
+            if not d.name.startswith("chromium-"):
+                continue
+            for sub in ["chrome-win64/chrome.exe", "chrome-win/chrome.exe",
+                        "chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium"]:
+                candidate = d / sub
+                if candidate.exists():
+                    return str(candidate)
+    return ""
+
+
 def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
     """Extract prices from eBay sold listings HTML.  Returns result dict."""
     query = (query or "").strip()
     result = {"query": query, "prices": [], "avg": 0, "median": 0,
               "low": 0, "high": 0, "count": 0, "fetched_at": datetime.now().isoformat(),
-              "source": "ebay_sold", "search_url": _ebay_search_url(query)}
+              "source": "ebay_sold", "search_url": _ebay_search_url(query),
+              "manual_url": _ebay_search_url(query)}
 
     if not query:
         result["error"] = "Empty eBay search query — no title, ASIN, or SKU"
         return result
 
     if html is None:
-        encoded = urllib.parse.quote_plus(query[:120])
-        # _sop=12 = End date: recent first — recent sold items
-        url = (f"https://www.ebay.com/sch/i.html?_nkw={encoded}"
-               "&LH_Complete=1&LH_Sold=1&_ipg=120&rt=nc&_sop=12")
+        url = _ebay_search_url(query)
         result["search_url"] = url
+        result["manual_url"] = url
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -592,8 +649,18 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
         try:
             with _ebay_opener.open(req, timeout=15) as resp:
                 html = resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            code = getattr(e, "code", 0) or 0
+            result["error"] = f"eBay blocked automated scrape (HTTP {code} {e.reason})"
+            result["blocked"] = True
+            result["count"] = 0
+            result["note"] = "Open the eBay Sold link to check prices in your browser."
+            return result
         except Exception as e:
-            result["error"] = f"fetch failed: {e}"
+            result["error"] = f"eBay scrape failed: {e}"
+            result["blocked"] = True
+            result["count"] = 0
+            result["note"] = "Open the eBay Sold link to check prices in your browser."
             return result
 
     # If we got a CAPTCHA page, mark as blocked — caller may try Playwright
@@ -605,6 +672,9 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
         result["blocked"] = True
         result["error"] = "eBay CAPTCHA / bot check — sold prices were not scraped"
         result["count"] = 0
+        result["note"] = "Open the eBay Sold link to check prices in your browser."
+        result["search_url"] = _ebay_search_url(query)
+        result["manual_url"] = result["search_url"]
         return result
 
     prices = []
@@ -668,105 +738,95 @@ def _ebay_sold_prices_basic(query: str, html: str = None) -> dict:
 
 
 def _ebay_sold_browser(query: str) -> dict:
-    """Use Playwright headless browser to fetch eBay sold listings (bypasses bot detection)."""
+    """Use Playwright + installed Chrome/Chromium to fetch eBay sold listings."""
     global _ebay_browser_available
+    url = _ebay_search_url(query)
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         _ebay_browser_available = False
-        return {"error": "Playwright is not installed — cannot bypass eBay CAPTCHA", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query,
-                "blocked": True, "search_url": _ebay_search_url(query)}
+        return _ebay_empty_result(
+            query,
+            "Playwright is not installed — cannot scrape eBay in a browser",
+            blocked=True,
+        )
 
-    # Find a working Chromium binary from Playwright's cache
-    chrome_paths = [
-        Path.home() / "AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe",
-        Path.home() / "AppData/Local/ms-playwright/chromium-1200/chrome-win64/chrome.exe",
-        Path.home() / ".cache/ms-playwright/chromium-1208/chrome-linux/chrome",
-        Path.home() / ".cache/ms-playwright/chromium-1200/chrome-linux/chrome",
-    ]
-    chrome_exe = None
-    for p in chrome_paths:
-        if p.exists():
-            chrome_exe = str(p)
-            break
-    # Also scan for any chromium-* folder
-    if chrome_exe is None:
-        for base in [Path.home() / "AppData/Local/ms-playwright",
-                     Path.home() / ".cache/ms-playwright"]:
-            if base.exists():
-                for d in sorted(base.iterdir(), reverse=True):
-                    if d.name.startswith("chromium-"):
-                        for sub in ["chrome-win64/chrome.exe", "chrome-win/chrome.exe",
-                                    "chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium"]:
-                            candidate = d / sub
-                            if candidate.exists():
-                                chrome_exe = str(candidate)
-                                break
-                    if chrome_exe:
-                        break
-
-    if not chrome_exe:
-        _ebay_browser_available = False
-        return {"error": "No Chromium browser found for Playwright (eBay CAPTCHA fallback unavailable)", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query,
-                "blocked": True, "search_url": _ebay_search_url(query)}
-
+    chrome_exe = _find_ebay_browser()
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, executable_path=chrome_exe)
-            page = browser.new_page()
-            url = _ebay_search_url(query)
-            page.goto(url, wait_until="domcontentloaded", timeout=15000)
-            page.wait_for_timeout(4000)  # Wait for JS rendering
-
-            html = page.page_source if hasattr(page, 'page_source') else page.content()
-            browser.close()
+            browser = None
+            last_err = None
+            launch_tries = []
+            if chrome_exe:
+                launch_tries.append({"headless": True, "executable_path": chrome_exe})
+            launch_tries.append({"headless": True, "channel": "chrome"})
+            launch_tries.append({"headless": True})
+            for kwargs in launch_tries:
+                try:
+                    browser = p.chromium.launch(**kwargs)
+                    break
+                except Exception as e:
+                    last_err = e
+                    browser = None
+            if browser is None:
+                _ebay_browser_available = False
+                return _ebay_empty_result(
+                    query,
+                    f"No Chromium/Chrome for Playwright ({last_err})",
+                    blocked=True,
+                )
+            try:
+                page = browser.new_page()
+                page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                page.wait_for_timeout(2500)
+                html = page.content()
+            finally:
+                browser.close()
 
         _ebay_browser_available = True
-        return _ebay_sold_prices_basic(query, html)
+        parsed = _ebay_sold_prices_basic(query, html)
+        parsed["search_url"] = url
+        parsed["manual_url"] = url
+        return parsed
     except Exception as e:
-        _ebay_browser_available = False
-        return {"error": f"browser fetch failed: {e}", "count": 0,
-                "fetched_at": datetime.now().isoformat(), "query": query,
-                "blocked": True, "search_url": _ebay_search_url(query)}
+        return _ebay_empty_result(query, f"browser scrape timed out or failed: {e}", blocked=True)
 
 
 def _ebay_sold_prices(query: str) -> dict:
-    """Try basic HTTP first, fall back to browser automation if blocked."""
+    """HTTP scrape first; Playwright / Chrome if blocked or empty; always keep sold URL."""
     query = (query or "").strip()
     if not query:
-        return {
-            "query": "", "count": 0, "prices": [], "avg": 0, "median": 0,
-            "error": "Empty eBay search query — no title, ASIN, or SKU",
-            "fetched_at": datetime.now().isoformat(),
-            "search_url": "https://www.ebay.com/sch/i.html?LH_Complete=1&LH_Sold=1",
-        }
+        return _ebay_empty_result("", "Empty eBay search query — no title, ASIN, or SKU")
 
     result = _ebay_sold_prices_basic(query)
     result["query"] = query
     result["search_url"] = result.get("search_url") or _ebay_search_url(query)
+    result["manual_url"] = result["search_url"]
 
-    if result.get("blocked") and _ebay_browser_available is not False:
-        add_log("info", f"🔄 eBay blocked basic request, trying browser for: {query[:50]}...")
+    need_browser = result.get("blocked") or result.get("count", 0) == 0
+    if need_browser:
+        add_log("info", f"🔄 eBay HTTP scrape missed prices ({result.get('error') or 'empty'}), trying browser for: {query[:50]}...")
         browser_result = _ebay_sold_browser(query)
         if browser_result.get("count", 0) > 0:
             add_log("info", f"✅ Browser eBay lookup found {browser_result['count']} prices")
             browser_result["query"] = query
             browser_result["search_url"] = _ebay_search_url(query)
+            browser_result["manual_url"] = browser_result["search_url"]
             return browser_result
-        err = browser_result.get("error") or result.get("error") or "eBay CAPTCHA blocked the lookup"
-        result["error"] = err
-        result["note"] = "Open the eBay Sold link to check prices in your browser."
-        result["count"] = 0
+        err = browser_result.get("error") or result.get("error") or "eBay blocked the automated scrape"
+        http_err = result.get("error")
+        if http_err and browser_result.get("error") and http_err not in str(browser_result.get("error")):
+            err = f"{http_err}. {browser_result.get('error')}"
+        result = _ebay_empty_result(query, err, blocked=True)
         add_log("warning", f"eBay sold lookup failed for '{query[:60]}': {err}")
 
     if result.get("count", 0) == 0:
         if not result.get("error"):
-            result["error"] = result.get("note") or "No sold prices parsed for this search"
-        result["note"] = result.get("note") or "Use the eBay Sold link to check manually."
+            result["error"] = "No sold prices parsed for this search"
+        result["note"] = "Open the eBay Sold link to check prices in your browser."
         result["fetched_at"] = result.get("fetched_at") or datetime.now().isoformat()
         result["search_url"] = _ebay_search_url(query)
+        result["manual_url"] = result["search_url"]
         result["query"] = query
 
     return result
@@ -1950,7 +2010,13 @@ class Handler(BaseHTTPRequestHandler):
                 result["manual_url"] = result["search_url"]
                 self.send_json(result)
             except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+                q = ""
+                try:
+                    q = query
+                except NameError:
+                    pass
+                fail = _ebay_empty_result(q, f"eBay lookup crashed: {e}", blocked=True)
+                self.send_json(fail, 500)
 
         elif path == "/api/sync/configure":
             try:
